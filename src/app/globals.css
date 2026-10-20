@@ -1,26 +1,41 @@
 @import "tailwindcss";
 
+/* Brand tokens — keep in sync with src/config/brand.ts */
+@theme {
+  --color-brand: #ac1f2d;
+  --color-brand-dark: #6e1420;
+  --color-brand-grey: #8a8a8d;
+  --color-brand-grey-light: #c9c9cc;
+  --color-ink: #0b0b0d;
+  --color-surface: #16161a;
+  --color-surface-raised: #202026;
+  --color-line: #2c2c33;
+  --font-sans: var(--font-display), "Nirmala UI", "Noto Sans Sinhala", "Noto Sans Tamil", system-ui, sans-serif;
+  --font-serif: var(--font-serif-face), Georgia, serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: #0b0b0d;
+  color: #f5f5f6;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Phone: no rubber-band overscroll behind the flow. */
+.phone-root {
+  overscroll-behavior: none;
+}
+
+/* Thin, dark scrollbars on the dashboard. */
+.dash-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #2c2c33 transparent;
 }

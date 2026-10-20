@@ -1,0 +1,17 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOperator() {
+      return request.auth != null
+        && request.auth.token.email in ['admin@operators.local'];   // keep in sync with src/config/operators.ts
+    }
+
+    match /events/{eventId}/{kind}/{file} {
+      allow read: if true;
+      allow create, update: if kind in ['spot', 'tile']
+                            && request.resource.size < 1 * 1024 * 1024
+                            && request.resource.contentType == 'image/jpeg';
+      allow delete: if isOperator();
+    }
+  }
+}

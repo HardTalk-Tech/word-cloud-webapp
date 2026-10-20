@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOperator() {
+      return request.auth != null
+        && request.auth.token.email in ['admin@operators.local'];   // keep in sync with src/config/operators.ts
+    }
+
+    match /events/{eventId} {
+      match /attendees/{id} {
+        allow read: if true;
+        allow create: if request.resource.data.name is string
+                      && request.resource.data.name.size() <= 30
+                      && request.resource.data.hidden == false;
+        allow update, delete: if isOperator();
+      }
+      match /responses/{id} {
+        allow read: if true;
+        allow create: if request.resource.data.answers is map;
+        allow delete: if isOperator();
+      }
+      match /control/{doc} {
+        allow read: if true;
+        allow write: if isOperator();
+      }
+    }
+  }
+}

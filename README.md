@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Event Selfie Wall + Live Word Cloud
 
-## Getting Started
+George Steuart live event app: attendees scan a QR code, add a selfie and name, answer 5 questions.
+Screen 1 welcomes each person and builds a photo wall; Screen 2 shows a live word cloud shaped like the crown.
+Operators run everything from a dashboard. See [PLAN.md](PLAN.md) for the full spec.
 
-First, run the development server:
-
+## Setup
 ```bash
+npm install
+cp .env.example .env      # Firebase web config (public values)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Route | Purpose |
+|---|---|
+| `/e/<event>` | Phone flow (QR target) |
+| `/screen/<event>/welcome` | Screen 1 — welcome + photo wall (`?debug=1` for stats) |
+| `/screen/<event>/cloud` | Screen 2 — crown word cloud |
+| `/control/login`, `/control/<event>` | Operator login + dashboard |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Event ids are allow-listed in `src/config/events.ts`: `main` (the real event) and `dev` (testing and rehearsals).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
+| Command | |
+|---|---|
+| `npm run test` | Unit tests (grid, queue, cloud layout, mask, export, validation) |
+| `npm run e2e` | Phone smoke test (Playwright, writes to the `dev` event) |
+| `npm run seed -- --event dev --count 1000` | Fake attendees + responses |
+| `npm run load-test -- --event dev --mode burst` | Simulated phones, p50/p95 |
+| `npm run brand` | Rebuild crown / wordmark / logo / crown silhouette images and the favicons from `public/brand/GS-Logo.png` |
+| `npm run deploy:rules` | Deploy Firestore + Storage rules (Firebase CLI) |
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Config lives in `src/config/*` (stage size, brand, questions, timings, operators).
+Event-day docs: [docs/KIOSK_SETUP.md](docs/KIOSK_SETUP.md), [docs/RUNBOOK.md](docs/RUNBOOK.md).
