@@ -1,6 +1,6 @@
 import { MAX_DPR } from '@/config/stage';
 import { BACKGROUND } from '@/config/background';
-import { BRAND, EVENT } from '@/config/brand';
+import { BRAND } from '@/config/brand';
 import type { FontFamilies } from '@/lib/fonts';
 
 /**
@@ -24,36 +24,6 @@ export function setupCanvas(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   return ctx;
-}
-
-/**
- * Event title for the LED screens, e.g. "ACHIEVERS NIGHT 2026": letter-spaced capitals in metallic
- * gold (vertical light → deep gold gradient). (x, y) = anchor at the vertical centre. Returns the drawn width.
- */
-export function drawEventTitle(
-  ctx: CanvasRenderingContext2D,
-  opts: { x: number; y: number; size: number; align: 'left' | 'center' | 'right'; fonts: FontFamilies; alpha?: number },
-): number {
-  const { x, y, size, align, fonts, alpha = 1 } = opts;
-  if (alpha <= 0) return 0;
-  const text = EVENT.title.toUpperCase();
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = `700 ${size}px ${fonts.display}`;
-  ctx.letterSpacing = `${Math.round(size * 0.16)}px`;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  const total = ctx.measureText(text).width;
-  const left = align === 'left' ? x : align === 'center' ? x - total / 2 : x - total;
-  const gold = ctx.createLinearGradient(0, y - size * 0.45, 0, y + size * 0.45);
-  gold.addColorStop(0, BRAND.goldLight);
-  gold.addColorStop(0.55, BRAND.gold);
-  gold.addColorStop(1, BRAND.goldDark);
-  ctx.fillStyle = gold;
-  ctx.fillText(text, left, y);
-  ctx.letterSpacing = '0px';
-  ctx.restore();
-  return total;
 }
 
 /** Soft round light sprite (bright core → transparent), drawn with 'lighter' for glows and sparks. */
@@ -115,7 +85,14 @@ export function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth:
 }
 
 /** Decoded brand images from public/brand (see BRAND in config). null = failed to load. */
-export type BrandImages = { crown: HTMLImageElement | null; wordmark: HTMLImageElement | null };
+export type BrandImages = {
+  crown: HTMLImageElement | null;
+  wordmark: HTMLImageElement | null;
+  /** Stacked logo: crown above "George Steuart / HEALTH". */
+  logo: HTMLImageElement | null;
+};
+
+export const NO_BRAND_IMAGES: BrandImages = { crown: null, wordmark: null, logo: null };
 
 async function loadImage(src: string): Promise<HTMLImageElement | null> {
   try {
@@ -129,8 +106,12 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 export async function loadBrandImages(): Promise<BrandImages> {
-  const [crown, wordmark] = await Promise.all([loadImage(BRAND.crown), loadImage(BRAND.wordmark)]);
-  return { crown, wordmark };
+  const [crown, wordmark, logo] = await Promise.all([
+    loadImage(BRAND.crown),
+    loadImage(BRAND.wordmark),
+    loadImage(BRAND.logo),
+  ]);
+  return { crown, wordmark, logo };
 }
 
 /** Draw an image at a given height, keeping its aspect. Returns the drawn width. */
@@ -141,8 +122,32 @@ export function drawAtHeight(ctx: CanvasRenderingContext2D, img: HTMLImageElemen
 }
 
 /**
+ * The George Steuart Health logo as the client supplied it: crown centred above the two-line wordmark.
+ * (x, y) = centre of the logo; `height` = full logo height.
+ */
+export function drawLogo(
+  ctx: CanvasRenderingContext2D,
+  opts: { x: number; y: number; height: number; fonts: FontFamilies; brand: BrandImages; alpha?: number },
+) {
+  const { x, y, height, fonts, brand, alpha = 1 } = opts;
+  if (alpha <= 0) return;
+  const logo = brand.logo;
+  if (!logo) {
+    // Fallback if the image failed to load: wordmark only.
+    drawWordmark(ctx, { x, y, height: height * 0.45, align: 'center', fonts, brand, crown: false, alpha });
+    return;
+  }
+  const w = (logo.naturalWidth / logo.naturalHeight) * height;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(logo, x - w / 2, y - height / 2, w, height);
+  ctx.restore();
+}
+
+/**
  * Logo lock-up: [crown] + "George Steuart / HEALTH" wordmark, in one row.
  * `height` is the crown height (or the wordmark height when `crown` is false).
+ * `width` (wordmark only) sizes the wordmark by width instead; its height follows the image.
  * (x, y) is the anchor: left/centre/right edge, vertical centre.
  */
 export function drawWordmark(
@@ -156,11 +161,16 @@ export function drawWordmark(
     brand: BrandImages;
     crown?: boolean;
     alpha?: number;
+    width?: number;
   },
 ) {
-  const { x, y, height, align, fonts, brand, crown = true, alpha = 1 } = opts;
+  const { x, y, align, fonts, brand, crown = true, alpha = 1, width } = opts;
   if (alpha <= 0) return;
   const crownImg = crown ? brand.crown : null;
+  const height =
+    width !== undefined && !crownImg && brand.wordmark
+      ? (brand.wordmark.naturalHeight / brand.wordmark.naturalWidth) * width
+      : opts.height;
   // Two-line "George Steuart / HEALTH" wordmark: ~70% of the crown height next to it.
   const wordH = crownImg ? height * 0.7 : height;
   const gap = crownImg ? height * 0.22 : 0;

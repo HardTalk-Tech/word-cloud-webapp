@@ -24,8 +24,8 @@ import { outlineDots, type OutlineDot } from '@/lib/mask/outline';
 import { hashString } from '@/lib/random';
 import { DEFAULT_CONTROL, type ControlState, type ResponseDoc } from '@/types/models';
 import {
+  NO_BRAND_IMAGES,
   clearStage,
-  drawEventTitle,
   drawWordmark,
   ellipsize,
   fitFontSize,
@@ -38,8 +38,10 @@ import type { DebugStats } from '@/components/stage/DebugOverlay';
 
 const W = STAGE.width;
 const H = STAGE.height;
-const CROWN_BOX: Rect = { x: W * 0.02, y: H * 0.105, w: W * 0.96, h: H * 0.75 };
-const WORDMARK_Y = H * 0.915;
+const CROWN_BOX: Rect = { x: W * 0.02, y: H * 0.035, w: W * 0.96, h: H * 0.68 };
+/** "George Steuart / HEALTH" under the crown cloud, wide enough to read as one stacked logo with it. */
+const WORDMARK_Y = H * 0.865;
+const WORDMARK_W = W * 0.8;
 const MASK_CELL = 3;
 const TAU = Math.PI * 2;
 /** Outline lights: distance outside the crown edge (cells) and spacing (stage px). */
@@ -59,7 +61,7 @@ export class CloudRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly fonts: FontFamilies;
   private mask: LoadedMask | null = null;
-  private brand: BrandImages = { crown: null, wordmark: null };
+  private brand: BrandImages = NO_BRAND_IMAGES;
   private widths: Record<string, number> | null = null;
   private outline: OutlineDot[] = [];
   private readonly outlineSprite: HTMLCanvasElement;
@@ -395,14 +397,15 @@ export class CloudRenderer {
     this.drawWords(now);
     this.drawFlyers(now);
 
-    // Event title at the top; the spotlight-question banner takes its place when shown.
-    const banner = this.drawBanner(now);
-    drawEventTitle(ctx, { x: W / 2, y: H * 0.06, size: 30, align: 'center', fonts: this.fonts, alpha: 1 - banner });
+    // Spotlight-question banner at the top, when shown.
+    this.drawBanner(now);
     drawWordmark(ctx, {
       x: W / 2,
       y: WORDMARK_Y - fin * 6,
       // Wordmark only: the cloud above it is the crown.
-      height: 64 + 14 * fin,
+      width: WORDMARK_W * (1 + 0.04 * fin),
+      // Text size if the wordmark image is missing.
+      height: 90,
       align: 'center',
       fonts: this.fonts,
       brand: this.brand,

@@ -23,7 +23,7 @@ Event ids are allow-listed in `src/config/events.ts`: `main` (the real event) an
 ## Scripts
 | Command | |
 |---|---|
-| `npm run test` | Unit tests (grid, queue, cloud layout, mask, export, validation) |
+| `npm run test` | Unit tests (ring wall, queue, cloud layout, mask, export, validation) |
 | `npm run e2e` | Phone smoke test (Playwright, writes to the `dev` event) |
 | `npm run seed -- --event dev --count 1000` | Fake attendees + responses |
 | `npm run load-test -- --event dev --mode burst` | Simulated phones, p50/p95 |

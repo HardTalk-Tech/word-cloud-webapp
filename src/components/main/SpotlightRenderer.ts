@@ -1,5 +1,5 @@
 // Welcome spotlight: dimmed/blurred wall snapshot, light-beam burst, photo card(s) and a frosted
-// name panel; then FLIP fly into the wall slot.
+// name panel; then FLIP fly into the centre circle of the ring wall.
 import confetti from 'canvas-confetti';
 import { BRAND, COPY } from '@/config/brand';
 import { STAGE } from '@/config/stage';
@@ -219,7 +219,8 @@ export class SpotlightRenderer {
       } else {
         rect = card;
       }
-      const radius = lerp(card.w * 0.06, 2, flyT);
+      // Rounded card → the round wall slot it lands in.
+      const radius = lerp(card.w * 0.06, person.target ? person.target.w / 2 : 2, flyT);
       const ringAlpha = phase === 'SPOT_FLY' ? 1 - flyT : appear;
 
       ctx.save();
