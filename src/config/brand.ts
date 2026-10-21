@@ -52,6 +52,6 @@ export const COPY = {
   consent: 'Your photo and name will be shown on the event screens.',
   successTitle: 'Look at the big screen!',
   thanksTitle: 'Thank you!',
-  thanksSub: 'Your answers are on the second screen.',
+  thanksSub: 'Your answers are on the screen.',
   welcome: 'Welcome',
 } as const;
