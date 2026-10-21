@@ -117,8 +117,8 @@ URL: <http://localhost:3000/screen/dev/cloud?debug=1>
 - **New answers:** the letters of each chosen word pop out of the "George Steuart / HEALTH" wordmark one by
   one and fly up with soft sparkles into that word in the crown, which then pulses. The layout is recalculated
   at most every 6 s and words glide to their new place.
-- **Wordmark** below the crown: the real George Steuart Health wordmark, faint, with small random letters
-  sprinkled inside its strokes; a few twinkle.
+- **Wordmark** below the crown: the real George Steuart Health wordmark, faint, with its strokes filled
+  with small random letters; a few twinkle.
 
 **How to feed it:** submit the questionnaire from the phone flow, or seed people with answers:
 ```bash

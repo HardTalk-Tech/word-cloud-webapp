@@ -437,7 +437,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 
 **Data**: `onSnapshot` on `responses` + `control/state`. Aggregate with `lib/cloud/aggregate.ts` → `Map<optionId, count>` (also per question).
 
-**Visual concept**: dark background; crown silhouette filled with answer words (crown moved up into the space the removed event title used); the "George Steuart / HEALTH" wordmark below the crown at ~60% of stage width: the **real wordmark drawn faint** (35%) as a frame, with a light sprinkle of small random letters living inside its thick strokes (`lib/cloud/letterMosaic.ts`: seeded A–Z, ~60% of eligible cells; warm white in the name, mint in HEALTH; clipped to the wordmark shape so none spill onto the black; pre-rendered once, a few letters twinkle). Settings in `WORDMARK_MOSAIC`. No event title. Optional question banner at the top when `spotlightQuestion` is set.
+**Visual concept**: dark background; crown silhouette filled with answer words (crown moved up into the space the removed event title used); the "George Steuart / HEALTH" wordmark below the crown at ~60% of stage width: the **real wordmark drawn faint** (35%) as a frame, with its strokes filled with small random letters (`lib/cloud/letterMosaic.ts`: seeded A–Z, one per 8px cell where the stroke covers ≥ 40%, ~88% kept; warm white in the name, mint in HEALTH; clipped to the wordmark shape so none spill onto the black; pre-rendered once, a few letters twinkle). Settings in `WORDMARK_MOSAIC`. No event title. Optional question banner at the top when `spotlightQuestion` is set.
 
 **Mask** (`lib/mask/mask.ts`): draw `crown-mask.png` at stage size → alpha threshold → occupancy grid with cell size 3px; cells outside crown pre-marked occupied.
 

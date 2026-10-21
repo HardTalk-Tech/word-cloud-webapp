@@ -59,12 +59,12 @@ export const WORDMARK_MOSAIC = {
   /** Opacity of the real wordmark underneath. */
   frameOpacity: 0.35,
   /** At most one letter per `cell` stage px, only where a stroke covers ≥ `coverage` of the cell. */
-  cell: 11,
-  coverage: 0.6,
-  /** Share of eligible cells that get a letter (the rest stay empty, so it reads as a light sprinkle). */
-  keep: 0.6,
+  cell: 8,
+  coverage: 0.4,
+  /** Share of eligible cells that get a letter (a few stay empty so the faint frame shows through). */
+  keep: 0.88,
   /** Letter size, × cell. */
-  fontScale: 0.75,
+  fontScale: 0.95,
   /** Letter colours: brighter tints of the stroke underneath. */
   name: '#F2EEEA',
   health: '#A8F2E8',
