@@ -49,6 +49,23 @@ export const CLOUD_PALETTE = {
   outline: '#FF4D5E',
 } as const;
 
+/** Screen 2 wordmark: "George Steuart / HEALTH" built from tiny random letters. */
+export const WORDMARK_MOSAIC = {
+  /** Wordmark width, × stage width. */
+  widthRatio: 0.6,
+  /** One letter per `cell` stage px of the wordmark's strokes. */
+  cell: 6,
+  /** Letter size, × cell. */
+  fontScale: 1.45,
+  name: '#B3B5B8',
+  health: '#11B9A8',
+  /** Twinkling letters drawn brighter on top. */
+  twinkle: '#FFFFFF',
+  seed: 'gsh-wordmark',
+  /** Soft star sparks shed by letters flying out of the wordmark. */
+  spark: '#FFE6EA',
+} as const;
+
 /** CSS variables set by next/font in the root layout. Canvas code reads them at runtime. */
 export const FONT_VARS = {
   display: '--font-display',

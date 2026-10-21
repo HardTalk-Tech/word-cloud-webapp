@@ -114,9 +114,10 @@ URL: <http://localhost:3000/screen/dev/cloud?debug=1>
 - A crown shape filled with the answer words. Bigger and brighter = chosen more often.
   The top 3 answers are white, the other answers are red, and small dim "filler" words fill the edges of the crown.
 - **No answers yet:** only dim filler words and a faint crown.
-- **New answers:** the layout is recalculated at most every 6 s and words glide to their new place;
-  a word whose count went up pulses briefly.
-- **Response counter** bottom-right, wordmark below the crown.
+- **New answers:** the letters of each chosen word pop out of the "George Steuart / HEALTH" wordmark one by
+  one and fly up with soft sparkles into that word in the crown, which then pulses. The layout is recalculated
+  at most every 6 s and words glide to their new place.
+- **Wordmark** below the crown, made of many tiny random letters (grey name, teal HEALTH); a few twinkle.
 
 **How to feed it:** submit the questionnaire from the phone flow, or seed people with answers:
 ```bash

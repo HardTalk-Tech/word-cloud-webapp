@@ -52,9 +52,20 @@ export const CLOUD = {
   autoRotateEveryMs: 30000,
   dimOpacity: 0.25,
   focusTweenMs: 600,
-  /** New answers: chosen words rise from the bottom and join the crown. */
-  flyMs: 1500,
+  /** New answers: the word's letters pop out of the wordmark one by one and fly into the crown. */
+  letterPopMs: 380,
+  letterFlyMs: 1700,
+  letterStaggerMs: 75,
+  /** Landed letters fade into the word (which then pulses). */
+  letterLandMs: 300,
   maxFlyers: 14,
+  /** Star sparks trailing each flying letter. */
+  sparkEveryMs: 45,
+  sparkLifeMs: 850,
+  maxSparks: 320,
+  /** Letters of the wordmark that twinkle at any moment, and how long each twinkle lasts. */
+  twinkleCount: 16,
+  twinkleMs: 1400,
   /** Redraw rate when only the gentle idle motion (twinkle / breathe / outline lights) is running. */
   idleFps: 30,
 } as const;
