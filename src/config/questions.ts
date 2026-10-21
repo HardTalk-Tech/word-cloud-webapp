@@ -6,70 +6,97 @@ export type Question = {
   options: { id: string; label: string }[];
 };
 
-// TBD: final questions from the client. Placeholders below.
+/** Build options a, b, c… from a list of labels (ids must stay stable once answers come in). */
+function opts(labels: string[]): Question['options'] {
+  return labels.map((label, i) => ({ id: String.fromCharCode(97 + i), label }));
+}
+
+// Final questions (client-approved). maxSelect = how many answers each person may pick.
 export const QUESTIONS: Question[] = [
   {
     id: 'q1',
-    text: 'What word best describes George Steuart to you?',
+    text: 'What makes GSH strong?',
     maxSelect: 3,
-    options: [
-      { id: 'a', label: 'Heritage' },
-      { id: 'b', label: 'Trust' },
-      { id: 'c', label: 'Excellence' },
-      { id: 'd', label: 'Family' },
-      { id: 'e', label: 'Legacy' },
-      { id: 'f', label: 'Pride' },
-    ],
+    options: opts([
+      'People',
+      'Teamwork',
+      'Trust',
+      'Expertise',
+      'Leadership',
+      'Quality',
+      'Integrity',
+      'Resilience',
+      'Heritage',
+      'Commitment',
+    ]),
   },
   {
     id: 'q2',
-    text: 'What drives you at work?',
+    text: 'What helped us succeed in H1?',
     maxSelect: 3,
-    options: [
-      { id: 'a', label: 'Teamwork' },
-      { id: 'b', label: 'Growth' },
-      { id: 'c', label: 'Impact' },
-      { id: 'd', label: 'Learning' },
-      { id: 'e', label: 'Customers' },
-      { id: 'f', label: 'Passion' },
-    ],
+    options: opts([
+      'Focus',
+      'Planning',
+      'Discipline',
+      'Dedication',
+      'Collaboration',
+      'Adaptability',
+      'Persistence',
+      'Goal-Oriented',
+      'Knowledge',
+      'Ownership',
+    ]),
   },
   {
     id: 'q3',
-    text: 'Which value should guide our next chapter?',
-    maxSelect: 2,
-    options: [
-      { id: 'a', label: 'Innovation' },
-      { id: 'b', label: 'Integrity' },
-      { id: 'c', label: 'Courage' },
-      { id: 'd', label: 'Agility' },
-      { id: 'e', label: 'Care' },
-    ],
+    text: 'What should we do differently?',
+    maxSelect: 3,
+    options: opts([
+      'Innovate',
+      'Simplify',
+      'Communicate',
+      'Organise',
+      'Empower',
+      'Upskill',
+      'Adapt',
+      'Anticipate',
+      'Prioritise',
+      'Experiment',
+    ]),
   },
   {
     id: 'q4',
-    text: 'How do you feel about the future?',
-    maxSelect: 2,
-    options: [
-      { id: 'a', label: 'Excited' },
-      { id: 'b', label: 'Confident' },
-      { id: 'c', label: 'Inspired' },
-      { id: 'd', label: 'Hopeful' },
-      { id: 'e', label: 'Ready' },
-    ],
+    text: 'Where should we focus next?',
+    maxSelect: 3,
+    options: opts([
+      'Customers',
+      'Markets',
+      'Products',
+      'Technology',
+      'Training',
+      'Compliance',
+      'Partnerships',
+      'Tenders',
+      'Distribution',
+      'Service',
+    ]),
   },
   {
     id: 'q5',
-    text: 'What makes us stronger together?',
+    text: 'What will accelerate our growth in H2?',
     maxSelect: 3,
-    options: [
-      { id: 'a', label: 'Unity' },
-      { id: 'b', label: 'Respect' },
-      { id: 'c', label: 'Diversity' },
-      { id: 'd', label: 'Support' },
-      { id: 'e', label: 'Vision' },
-      { id: 'f', label: 'Gratitude' },
-    ],
+    options: opts([
+      'Execution',
+      'Speed',
+      'Efficiency',
+      'Accountability',
+      'Expansion',
+      'Investment',
+      'Diversification',
+      'Coordination',
+      'Conversions',
+      'Agility',
+    ]),
   },
 ];
 

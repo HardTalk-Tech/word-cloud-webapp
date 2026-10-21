@@ -477,7 +477,9 @@ export class CloudRenderer {
   private drawFlyers(now: number) {
     if (!this.flyers.length) return;
     const ctx = this.ctx;
+    // Fly to the option's big word; if it isn't one (outside the top options), to one of its small copies.
     const heroPos = new Map<string, { x: number; y: number }>();
+    for (const w of this.frameWords) if (w.layer === 'filler' && w.alpha > 0.5) heroPos.set(w.optionKey, w);
     for (const w of this.frameWords) if (w.layer === 'hero' && w.alpha > 0.5) heroPos.set(w.optionKey, w);
     const fallback = this.mask
       ? { x: this.mask.rect.x + this.mask.rect.w / 2, y: this.mask.rect.y + this.mask.rect.h * 0.6 }

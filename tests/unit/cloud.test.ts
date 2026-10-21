@@ -87,11 +87,19 @@ describe('layoutCloud', () => {
   const input = words((i) => 120 - i * 17);
   const opts = { ...DEFAULT_LAYOUT, seed: 'test' };
 
-  it('places every hero once, inside the mask, with no overlaps', () => {
+  it('places the top options as heroes once, every option somewhere, inside the mask, no overlaps', () => {
     const placed = layoutCloud(mask, input, widths, opts);
     const heroes = placed.filter((p) => p.layer === 'hero');
     expect(new Set(heroes.map((h) => h.key)).size).toBe(heroes.length);
-    expect(heroes.length).toBe(input.length);
+    const chosen = input.filter((w) => w.count > 0);
+    expect(heroes.length).toBe(Math.min(DEFAULT_LAYOUT.maxHeroes, chosen.length));
+    // Heroes are the most-chosen options.
+    const minHeroCount = Math.min(...heroes.map((h) => input.find((w) => w.key === h.optionKey)!.count));
+    const notHero = chosen.filter((w) => !heroes.some((h) => h.optionKey === w.key));
+    for (const w of notHero) expect(w.count).toBeLessThanOrEqual(minHeroCount);
+    // Every option still shows up (as a hero or as filler).
+    const shown = new Set(placed.map((p) => p.optionKey));
+    for (const w of input) expect(shown.has(w.key)).toBe(true);
     expect(placed.filter((p) => p.layer === 'filler').length).toBeGreaterThan(50);
 
     const grid = new Uint8Array(mask.cols * mask.rows);

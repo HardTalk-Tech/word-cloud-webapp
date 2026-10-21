@@ -38,21 +38,21 @@ describe('export rows', () => {
     expect(rows[0][2]).toBe('Finance');
     expect(rows[0][3]).toBe('2026-10-20 18:00:00');
     expect(rows[0][4]).toBe('Yes');
-    expect(rows[0][5]).toBe('Heritage; Excellence');
-    expect(rows[0][6]).toBe('Growth');
+    expect(rows[0][5]).toBe('People; Trust');
+    expect(rows[0][6]).toBe('Planning');
     expect(rows[1][4]).toBe('No');
     expect(rows[1].at(-1)).toBe('Yes');
   });
 
   it('summary + long rows', () => {
     const summary = buildSummaryRows(responses, QUESTIONS);
-    expect(summary.find((r) => r[1] === 'Heritage')).toEqual([QUESTIONS[0].text, 'Heritage', 1, 100]);
-    expect(summary.find((r) => r[1] === 'Trust')![2]).toBe(0);
+    expect(summary.find((r) => r[1] === 'People')).toEqual([QUESTIONS[0].text, 'People', 1, 100]);
+    expect(summary.find((r) => r[1] === 'Teamwork')![2]).toBe(0);
     const long = buildLongRows(attendees, responses, QUESTIONS);
     expect(long).toEqual([
-      ['කසුන්', 'Finance', QUESTIONS[0].text, 'Heritage'],
-      ['කසුන්', 'Finance', QUESTIONS[0].text, 'Excellence'],
-      ['කසුන්', 'Finance', QUESTIONS[1].text, 'Growth'],
+      ['කසුන්', 'Finance', QUESTIONS[0].text, 'People'],
+      ['කසුන්', 'Finance', QUESTIONS[0].text, 'Trust'],
+      ['කසුන්', 'Finance', QUESTIONS[1].text, 'Planning'],
     ]);
   });
 });

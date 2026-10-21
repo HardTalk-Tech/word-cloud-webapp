@@ -61,7 +61,9 @@ describe('answers validation', () => {
   });
   it('rejects missing, too many, unknown and duplicate', () => {
     expect(validateAnswers({ ...all, q1: [] }, QUESTIONS)).not.toBeNull();
-    expect(validateAnswers({ ...all, q3: ['a', 'b', 'c'] }, QUESTIONS)).not.toBeNull();
+    const q3 = QUESTIONS.find((q) => q.id === 'q3')!;
+    const tooMany = q3.options.slice(0, q3.maxSelect + 1).map((o) => o.id);
+    expect(validateAnswers({ ...all, q3: tooMany }, QUESTIONS)).not.toBeNull();
     expect(validateAnswers({ ...all, q1: ['zz'] }, QUESTIONS)).not.toBeNull();
     expect(validateAnswers({ ...all, q1: ['a', 'a'] }, QUESTIONS)).not.toBeNull();
     expect(validateAnswers({ ...all, q9: ['a'] }, QUESTIONS)).not.toBeNull();

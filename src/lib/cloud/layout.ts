@@ -52,6 +52,8 @@ export type LayoutOptions = {
   fillerFailLimit: number;
   /** Multiplies filler opacity (dim empty state). */
   fillerOpacityScale: number;
+  /** Only the most-chosen options become big words; the rest still appear as filler. */
+  maxHeroes: number;
 };
 
 export const DEFAULT_LAYOUT: Omit<LayoutOptions, 'seed'> = {
@@ -64,6 +66,7 @@ export const DEFAULT_LAYOUT: Omit<LayoutOptions, 'seed'> = {
   maxHeroWidthRatio: 0.8,
   fillerFailLimit: 70,
   fillerOpacityScale: 1,
+  maxHeroes: 30,
 };
 
 /** Box height relative to font size: uppercase heavy sans (cap height) / title-case serif (with descenders). */
@@ -230,12 +233,14 @@ export function layoutCloud(
     });
   };
 
-  // ── Heroes: every option once, sized by count, spiralling out from the centroid.
+  // ── Heroes: the most-chosen options once each, sized by count, spiralling out from the centroid.
+  // (With many options the crown can't hold them all as big words; the rest appear as filler.)
   const maxCount = Math.max(0, ...words.map((w) => w.count));
   if (maxCount > 0) {
     const heroes = words
-      .slice()
+      .filter((w) => w.count > 0)
       .sort((a, b) => b.count - a.count || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+      .slice(0, opts.maxHeroes)
       .map((w, rank) => {
         const tier = tierForRank(rank, w.count);
         const font = heroFont(w.key, tier);
@@ -311,11 +316,11 @@ export function layoutCloud(
   const counters = new Map<string, number>();
   const fillerColors = CLOUD_PALETTE.filler;
 
-  const tryFiller = (w: CloudWord, size: number): boolean => {
-    const rotate: 0 | 90 = random() < 0.2 ? 90 : 0;
+  const tryFiller = (w: CloudWord, size: number, probes = 4, forceRotate?: 0 | 90): boolean => {
+    const rotate: 0 | 90 = forceRotate ?? (random() < 0.2 ? 90 : 0);
     const text = wordText('sans', w.label);
     const { w: bw, h: bh } = box(widthOf('sans', text), size, cell, FILLER_PAD, rotate, 'sans');
-    for (let probe = 0; probe < 4; probe++) {
+    for (let probe = 0; probe < probes; probe++) {
       const idx = insideList[Math.floor(random() * insideList.length)];
       if (occ.blocked[idx]) continue;
       const cx = idx % mask.cols;
@@ -344,6 +349,17 @@ export function layoutCloud(
   const mid = (opts.fillerMin + opts.fillerMax) / 2;
   for (let round = 0; round < 3; round++) {
     for (const w of words) tryFiller(w, mid + 2 - round * 2);
+  }
+  // Guarantee: any option still missing (long words in a crowded crown) tries harder —
+  // smaller, both orientations, more spots — so every answer is visible somewhere.
+  const shown = new Set(placed.map((p) => p.optionKey));
+  for (const w of words) {
+    if (shown.has(w.key)) continue;
+    search: for (const size of [mid, opts.fillerMin, opts.fillerMin - 2]) {
+      for (const rotate of [0, 90] as const) {
+        if (tryFiller(w, size, 40, rotate)) break search;
+      }
+    }
   }
 
   for (let band = opts.fillerMax; band >= opts.fillerMin && occ.coverage < opts.coverage; band -= 2) {

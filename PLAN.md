@@ -244,7 +244,8 @@ events/{eventId}/tile/{id}.jpg    (128x128)
 Upload metadata: `contentType: 'image/jpeg'`, `cacheControl: 'public, max-age=31536000, immutable'`. Store `getDownloadURL()` results in the attendee doc.
 
 ### Questions config (`src/config/questions.ts`)
-Questions and options are **`TBD`** — create 5 placeholder questions with 5–6 options each. Shape:
+Questions are **final** (client-approved): 5 questions × 10 options, up to 3 picks each. With 50 options the cloud shows
+the 30 most-chosen as big words (`maxHeroes` in `lib/cloud/layout.ts`); every other option still appears as filler. Shape:
 ```ts
 export type Question = {
   id: string;            // 'q1'..'q5'
@@ -644,7 +645,7 @@ start chrome --kiosk --user-data-dir=C:\kiosk-cloud --window-position=3168,0 htt
 | # | Question | Affects | Placeholder |
 |---|---|---|---|
 | 1 | LED pixel pitch, exact wall resolution, LED processor input resolution/mapping | `config/stage.ts`, kiosk setup | 1248 × 1170 |
-| 2 | Final 5 questions, options (short labels), max selections each | `config/questions.ts` | placeholders |
+| 2 | Final 5 questions, options (short labels), max selections each | `config/questions.ts` | Done: final 5 questions, 10 options each, max 3 picks (confirm max picks) |
 | 3 | Exact brand red and fonts / logo files (SVG) and crown silhouette | `config/brand.ts`, `public/brand/` | Done: `#AC1F2D` + crown from `GS-Logo.png` (SVG would be sharper); fonts still placeholders |
 | 4 | Welcome/landing copy and consent wording | phone UI | placeholder copy |
 | 5 | One laptop or two for the walls | kiosk setup | one laptop |
