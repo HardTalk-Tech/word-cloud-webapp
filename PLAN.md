@@ -404,7 +404,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 - Only the **newest 25** attendees are on the wall, as equal round photos on a fixed **5 × 5 grid**. The first 25 fill it in registration order (left → right, top → bottom). **Photos never move**: from the 26th arrival on, the newcomer takes the spot of the oldest person on the wall (who shrinks away in sparks). With 700 attendees the wall always shows the latest 25.
 - A hidden attendee fades out and the next-oldest person returns in that spot. Empty spots (< 25 arrivals) are dim glass circles.
 - Background pattern: faint concentric rings centred on the grid (outer ones run past it) with light pulses travelling round. Only the pattern moves.
-- First-name tag on every circle. Circles use the spot photo (800px) once decoded, else the 128px tile.
+- Name badge on every circle (pre-rendered sprite, cached): first name in white, a short red divider, department in small spaced capitals (brand rose), wrapping to two lines when long; dark glass pill with a red rim across the circle's bottom edge. Circles use the spot photo (800px) once decoded, else the 128px tile.
 - Idle ambience: every 2–3s a random circle glows/scales up slightly for ~1s; a light sweep every 20–30s; faint crown watermark (≤ 6% opacity).
 
 **Spotlight queue** (`lib/wall/queue.ts`, pure state machine + unit tests):
@@ -602,7 +602,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 ### Phase 9 — Client feedback (screens)
 - [x] Remove "Achievers Night 2026" from both LED screens (wall header, wall finale, cloud).
 - [x] Screen 1 header: stacked logo (crown above "George Steuart / HEALTH"), centred.
-- [x] Screen 1 photo wall: newest 25 as still circles on a 5 × 5 grid; a newcomer replaces the oldest in place; decorative rings with travelling pulses behind; name tags, exit sparks. `lib/wall/slots.ts` + `tests/unit/slots.test.ts` (replaces `lib/wall/grid.ts`).
+- [x] Screen 1 photo wall: newest 25 as still circles on a 5 × 5 grid; a newcomer replaces the oldest in place; decorative rings with travelling pulses behind; name + department badges, exit sparks. `lib/wall/slots.ts` + `tests/unit/slots.test.ts` (replaces `lib/wall/grid.ts`).
 - [x] Final mode builds the crown from all attendees, not just the 25 on the wall.
 - [x] Screen 2: crown moved up, wordmark ~80% of stage width under it.
 

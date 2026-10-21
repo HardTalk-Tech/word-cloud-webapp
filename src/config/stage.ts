@@ -19,7 +19,7 @@ export const WALL_GRID = {
   cols: 5,
   rows: 5,
   /** Circle diameter as a share of its grid cell. */
-  fill: 0.86,
+  fill: 0.82,
 } as const;
 
 /** Decorative rings behind the grid (radius × half the grid size); the outer ones run past the grid. */

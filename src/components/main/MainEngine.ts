@@ -549,13 +549,13 @@ export class MainEngine {
       this.ambient = null;
     }
 
-    // First-name tag on every circle.
+    // Name + department badge on every circle.
     if (wallA > 0) {
       for (const d of drawList) {
         if (d.t.leaveAt !== null || d.t.slot >= CAPACITY) continue;
         const a = this.attendees.get(d.id);
         if (!a) continue;
-        drawNameTag(ctx, this.fonts, d.rect, firstName(a.name), '', wallA * tileFx(d.t, now).alpha);
+        drawNameTag(ctx, this.sprites, this.fonts, d.rect, firstName(a.name), a.department, wallA * tileFx(d.t, now).alpha);
       }
     }
 

@@ -158,6 +158,124 @@ function makeSweepSprite(): HTMLCanvasElement {
   return c;
 }
 
+/** Name badge sprite: drawn size in stage px; the canvas is at LABEL_SCALE × for crisp text. */
+type LabelSprite = { canvas: HTMLCanvasElement; w: number; h: number };
+const LABEL_SCALE = 2;
+
+/** Word-wrap into at most `max` lines that fit `width`; the last line is ellipsized if needed. */
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, width: number, max: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = '';
+  for (let i = 0; i < words.length; i++) {
+    const next = line ? `${line} ${words[i]}` : words[i];
+    if (ctx.measureText(next).width <= width || !line) {
+      line = next;
+      continue;
+    }
+    if (lines.length === max - 1) {
+      line = words.slice(i - line.split(' ').length, words.length).join(' ');
+      break;
+    }
+    lines.push(line);
+    line = words[i];
+  }
+  if (line) lines.push(ellipsize(ctx, line, width));
+  return lines.slice(0, max);
+}
+
+/**
+ * Badge for a wall circle: first name (heavy, white), a short red divider, and the department in small
+ * spaced capitals (brand rose), wrapping to two lines when long. Dark glass pill with a red rim and a lit
+ * top edge. `d` = circle diameter; the badge may run a little wider than the circle (still inside its cell).
+ */
+function makeLabelSprite(fonts: FontFamilies, name: string, department: string, d: number): LabelSprite {
+  const [, m] = spriteCanvas(1);
+  const maxText = d * 1.02;
+  const nameFont = (s: number) => `800 ${s}px ${fonts.display}`;
+  const deptFont = (s: number) => `700 ${s}px ${fonts.display}`;
+  const spacing = (s: number) => `${(s * 0.1).toFixed(1)}px`;
+  const nameSize = fitFontSize(m, name, nameFont, maxText, Math.round(d * 0.125), 15);
+  m.font = nameFont(nameSize);
+  const nameText = ellipsize(m, name, maxText);
+  const nameW = m.measureText(nameText).width;
+
+  const dept = department.trim().replace(/\s+/g, ' ').toUpperCase();
+  let deptSize = 0;
+  let deptLines: string[] = [];
+  let deptW = 0;
+  if (dept) {
+    // One line if it fits at a readable size, otherwise two.
+    deptSize = Math.max(12, Math.round(nameSize * 0.6));
+    m.font = deptFont(deptSize);
+    m.letterSpacing = spacing(deptSize);
+    while (deptSize > 12 && m.measureText(dept).width > maxText) {
+      deptSize--;
+      m.font = deptFont(deptSize);
+      m.letterSpacing = spacing(deptSize);
+    }
+    deptLines = m.measureText(dept).width <= maxText ? [dept] : wrapLines(m, dept, maxText, 2);
+    deptW = Math.max(...deptLines.map((l) => m.measureText(l).width));
+  }
+
+  const padX = nameSize * 0.7;
+  const padY = nameSize * 0.34;
+  const gap = dept ? nameSize * 0.42 : 0;
+  const lineH = deptSize * 1.2;
+  const w = Math.ceil(Math.min(d * 1.16, Math.max(nameW, deptW) + padX * 2));
+  const h = Math.ceil(padY * 2 + nameSize + (dept ? gap + lineH * deptLines.length - (lineH - deptSize) : 0));
+  const [c, ctx] = spriteCanvas(w * LABEL_SCALE, h * LABEL_SCALE);
+  ctx.scale(LABEL_SCALE, LABEL_SCALE);
+  const radius = Math.min(h / 2, nameSize * 0.9);
+
+  // Glass pill.
+  roundRectPath(ctx, 1, 1, w - 2, h - 2, radius);
+  const bg = ctx.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, 'rgba(46,14,22,0.94)');
+  bg.addColorStop(1, 'rgba(12,6,8,0.94)');
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(226,71,90,0.85)';
+  ctx.stroke();
+  ctx.save();
+  ctx.clip();
+  const hl = ctx.createLinearGradient(0, 0, 0, Math.min(h * 0.5, nameSize * 1.2));
+  hl.addColorStop(0, 'rgba(255,255,255,0.10)');
+  hl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = hl;
+  ctx.fillRect(0, 0, w, h * 0.5);
+  ctx.restore();
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const cx = w / 2;
+  ctx.font = nameFont(nameSize);
+  ctx.fillStyle = BRAND.white;
+  ctx.fillText(nameText, cx, padY + nameSize * 0.52);
+
+  if (deptLines.length) {
+    // Short red divider that fades at both ends.
+    const lineY = padY + nameSize + gap / 2;
+    const half = Math.min(w * 0.3, Math.max(nameW, deptW) / 2);
+    const g = ctx.createLinearGradient(cx - half, 0, cx + half, 0);
+    g.addColorStop(0, 'rgba(226,71,90,0)');
+    g.addColorStop(0.5, 'rgba(226,71,90,0.95)');
+    g.addColorStop(1, 'rgba(226,71,90,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - half, lineY - 0.75, half * 2, 1.5);
+
+    ctx.font = deptFont(deptSize);
+    ctx.letterSpacing = spacing(deptSize);
+    ctx.fillStyle = '#FF9AA6';
+    deptLines.forEach((line, i) => {
+      // letterSpacing adds space after the last glyph too: nudge back so the line stays centred.
+      ctx.fillText(line, cx + deptSize * 0.05, padY + nameSize + gap + deptSize * 0.52 + i * lineH);
+    });
+  }
+  return { canvas: c, w, h };
+}
+
 /** Holds the pre-rendered wall sprites. */
 export class WallSprites {
   readonly glass = makeGlassSprite();
@@ -166,6 +284,7 @@ export class WallSprites {
   readonly spark = glowSprite('#FFD9DD', 48);
   readonly sweep = makeSweepSprite();
   private tiles = new WeakMap<object, HTMLCanvasElement>();
+  private labels = new Map<string, LabelSprite>();
 
   /** Round tile sprite for a decoded image (created once per image). */
   tile(img: HTMLImageElement | null): HTMLCanvasElement | null {
@@ -176,6 +295,18 @@ export class WallSprites {
       this.tiles.set(img, s);
     }
     return s;
+  }
+
+  /** Name badge (created once per name + department + size; at most a screenful are kept). */
+  label(fonts: FontFamilies, name: string, department: string, d: number): LabelSprite {
+    const key = `${Math.round(d)}|${name}|${department}`;
+    let l = this.labels.get(key);
+    if (!l) {
+      l = makeLabelSprite(fonts, name, department, d);
+      if (this.labels.size >= 64) this.labels.delete(this.labels.keys().next().value!);
+      this.labels.set(key, l);
+    }
+    return l;
   }
 }
 
@@ -319,53 +450,23 @@ export function drawGlowTile(
   ctx.restore();
 }
 
-/** Name on a dark pill across the bottom of a circle. `detail` (department) adds a smaller second line. */
+/** Name + department badge across the bottom edge of a circle. */
 export function drawNameTag(
   ctx: CanvasRenderingContext2D,
+  sprites: WallSprites,
   fonts: FontFamilies,
   r: Rect,
   name: string,
-  detail: string,
+  department: string,
   alpha: number,
 ) {
   if (alpha <= 0.01 || !name) return;
-  const maxW = r.w * 0.92;
-  const nameMax = Math.round(r.w * (detail ? 0.1 : 0.13));
-  const nameFont = (s: number) => `800 ${s}px ${fonts.display}`;
-  const nameSize = fitFontSize(ctx, name, nameFont, maxW - 24, nameMax, 14);
-  const detailSize = detail ? Math.max(12, Math.round(nameSize * 0.62)) : 0;
-  const padY = nameSize * 0.32;
-  const h = nameSize + padY * 2 + (detail ? detailSize * 1.15 : 0);
+  const l = sprites.label(fonts, name, department, r.w);
+  // Straddles the rim: mostly over the photo's lower edge, a little below it.
+  const top = r.y + r.h - l.h * 0.68;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.font = nameFont(nameSize);
-  const label = ellipsize(ctx, name, maxW - 24);
-  let w = ctx.measureText(label).width + nameSize * 1.1;
-  let detailLabel = '';
-  if (detail) {
-    ctx.font = `600 ${detailSize}px ${fonts.display}`;
-    detailLabel = ellipsize(ctx, detail, maxW - 24);
-    w = Math.max(w, ctx.measureText(detailLabel).width + nameSize * 1.1);
-  }
-  w = Math.min(maxW, w);
-  const cx = r.x + r.w / 2;
-  const top = r.y + r.h - h * 0.8;
-  roundRectPath(ctx, cx - w / 2, top, w, h, h / 2);
-  ctx.fillStyle = 'rgba(14,8,10,0.82)';
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = 'rgba(214,60,78,0.7)';
-  ctx.stroke();
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = BRAND.white;
-  ctx.font = nameFont(nameSize);
-  ctx.fillText(label, cx, top + padY + nameSize / 2);
-  if (detailLabel) {
-    ctx.font = `600 ${detailSize}px ${fonts.display}`;
-    ctx.fillStyle = '#FF9AA6';
-    ctx.fillText(detailLabel, cx, top + padY + nameSize + detailSize * 0.62);
-  }
+  ctx.drawImage(l.canvas, r.x + r.w / 2 - l.w / 2, top, l.w, l.h);
   ctx.restore();
 }
 

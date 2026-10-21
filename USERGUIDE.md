@@ -86,7 +86,8 @@ URL: <http://localhost:3000/screen/dev/welcome?debug=1>
 - **Header:** the George Steuart Health logo (crown above the wordmark), centred.
 - **Photo wall:** the **25 most recent** arrivals as round photos on a 5 × 5 grid, filled in registration
   order. Photos never move: from the 26th arrival on, the newcomer takes the spot of the oldest person on the
-  wall. Faint rings with travelling lights run behind the grid.
+  wall. Each photo has a badge with the first name and department. Faint rings with travelling lights run
+  behind the grid.
 - **Idle glow:** every 2–3 s a random circle grows slightly with a red ring.
 - **Welcome spotlight:** when someone registers, the wall dims, confetti fires, a big card shows
   *Welcome* + their name, then the photo flies into its spot on the wall.
