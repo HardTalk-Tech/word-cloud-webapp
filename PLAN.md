@@ -115,8 +115,10 @@ Vercel: serves the Next.js pages only.
 - All brand values in `src/config/brand.ts`.
 - **Event:** *George Steuart Health Achievers Night 2026* (`EVENT` in `src/config/brand.ts`). The wordmark is the
   George Steuart **Health** lock-up (`GS-Health-Logo.png`: grey name + teal `#11B9A8` "HEALTH"), shown with the crown
-  on the phone, dashboard and both screens; the event title appears on the phone landing page, the Screen 1 header
-  and finale, the top of Screen 2, the login page, page titles and export file names.
+  on the phone, dashboard and both screens; the event title appears on the phone landing page, the login page, page
+  titles and export file names. **The LED screens do not show the event title** (client feedback): Screen 1 shows the
+  stacked logo (`logo-dark.png`, crown above the wordmark) centred in its header; Screen 2 shows the crown cloud with a
+  large wordmark under it.
 - **LED background** (both screens): animated dark-red glow, soft stage-light beams and glowing bokeh dots, drawn on its own
   canvas behind the screen canvas (`components/stage/BackgroundRenderer.ts`, settings in `src/config/background.ts`).
   Pre-rendered sprites, ~30 fps, never forces the wall/cloud to redraw. The cloud variant is calmer and darkens the area
@@ -174,7 +176,7 @@ src/
     device-id.ts                         # localStorage UUID + flow state + epoch
     profanity.ts
     images/cache.ts                      # preload + decode + Map cache (screens)
-    wall/grid.ts                         # tile grid math + tiers (pure)
+    wall/slots.ts                        # photo wall: newest-25 window, 5×5 grid, stable spots (pure)
     wall/queue.ts                        # spotlight queue state machine (pure)
     mask/mask.ts                         # PNG → occupancy grid
     cloud/aggregate.ts                   # responses → counts (pure)
@@ -397,12 +399,13 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 
 **Image cache** (`lib/images/cache.ts`): for every attendee, load `tileUrl` → `await img.decode()` → store. Spotlight loads `spotUrl` the same way **before** the spotlight starts. Draw `lqip` until the tile is decoded.
 
-**Wall layout** (`lib/wall/grid.ts`, pure + unit tested):
-- Reserved header band (top ~8% of stage): logo wordmark left, live counter right ("**432** joined").
-- Grid **capacity tiers**: `[60, 150, 300, 500, 750, 1000]`. Choose the smallest tier ≥ attendee count; compute cols × rows that best fill the remaining area with square tiles + 4px gaps.
-- Slot order: seeded shuffle of all slots so the wall fills **evenly across the screen**, not top-left first. Attendee *n* (by createdAt) → slot order[n].
-- When the tier changes: animate all tiles from old to new positions/sizes over 1.2s (ease-in-out).
-- Idle ambience: every 2–3s a random tile glows/scales up slightly for ~1s; background has a faint crown watermark (≤ 6% opacity).
+**Photo wall** (`lib/wall/slots.ts`, pure + unit tested; config `WALL_GRID` / `RING_PATTERN` in `config/stage.ts`):
+- Header band (top ~16% of stage): the stacked George Steuart Health logo, centred. No event title.
+- Only the **newest 25** attendees are on the wall, as equal round photos on a fixed **5 × 5 grid**. The first 25 fill it in registration order (left → right, top → bottom). **Photos never move**: from the 26th arrival on, the newcomer takes the spot of the oldest person on the wall (who shrinks away in sparks). With 700 attendees the wall always shows the latest 25.
+- A hidden attendee fades out and the next-oldest person returns in that spot. Empty spots (< 25 arrivals) are dim glass circles.
+- Background pattern: faint concentric rings centred on the grid (outer ones run past it) with light pulses travelling round. Only the pattern moves.
+- Name badge on every circle (pre-rendered sprite, cached): first name in white, a short red divider, department in small spaced capitals (brand rose), wrapping to two lines when long; dark glass pill with a red rim across the circle's bottom edge. Circles use the spot photo (800px) once decoded, else the 128px tile.
+- Idle ambience: every 2–3s a random circle glows/scales up slightly for ~1s; a light sweep every 20–30s; faint crown watermark (≤ 6% opacity).
 
 **Spotlight queue** (`lib/wall/queue.ts`, pure state machine + unit tests):
 - States: `WALL_IDLE → SPOT_IN → SPOT_HOLD → SPOT_FLY → (next | WALL_IDLE)`.
@@ -420,10 +423,10 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 **Spotlight visual** (`SpotlightRenderer.ts`):
 - Wall dims to ~35% and blurs slightly (pre-render a blurred wall snapshot to an offscreen canvas once per spotlight; don't blur every frame).
 - Card: photo ~55% of stage height, rounded corners, red accent ring; "Welcome" (serif) + name (heavy sans, auto-fit to width); confetti burst in brand colours on SPOT_IN.
-- FLY: card scales/translates exactly into the attendee's wall slot (FLIP), wall un-dims during the flight, tile lands with a small bounce.
+- FLY: card scales/translates exactly into the attendee's grid spot (FLIP, corners rounding into a circle); wall un-dims during the flight, tile lands with a small bounce.
 
 **Final mode** (`mode === 'final'`, `FinalMosaic.ts`):
-- Load `crown-mask.png` → occupancy grid. Find the largest tile size where ≥ N cells fit inside the mask. Assign attendees to in-mask cells (seeded). Animate every tile from wall position to crown position over 2.5s with staggered delays. Wordmark fades in below. Hold until mode returns to `live`.
+- Load `crown-mask.png` → occupancy grid. Find the largest tile size where ≥ N cells fit inside the mask. Assign **all** visible attendees (not only the 25 on the rings) to in-mask cells (seeded). The 25 on the wall fly from their spots; everyone else grows out of their crown cell, staggered over 2.5s. Wordmark fades in below (no event title). Hold until mode returns to `live`.
 
 **Performance rules**:
 - One `requestAnimationFrame` loop per screen; skip drawing when nothing changes.
@@ -434,7 +437,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 
 **Data**: `onSnapshot` on `responses` + `control/state`. Aggregate with `lib/cloud/aggregate.ts` → `Map<optionId, count>` (also per question).
 
-**Visual concept**: dark background; crown silhouette filled with answer words; logo wordmark ("George Steuart") static below the crown in grey; response counter in a corner. Optional question banner above the crown when `spotlightQuestion` is set.
+**Visual concept**: dark background; crown silhouette filled with answer words (crown moved up into the space the removed event title used); the "George Steuart / HEALTH" wordmark below the crown at ~80% of stage width, so crown + wordmark read as one stacked logo. No event title. Optional question banner at the top when `spotlightQuestion` is set.
 
 **Mask** (`lib/mask/mask.ts`): draw `crown-mask.png` at stage size → alpha threshold → occupancy grid with cell size 3px; cells outside crown pre-marked occupied.
 
@@ -595,6 +598,15 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 - [x] Generate print-ready QR code (SVG/PNG) for `https://<domain>/e/main`.
 
 **Done when:** a teammate can set up both walls from the docs alone during rehearsal.
+
+### Phase 9 — Client feedback (screens)
+- [x] Remove "Achievers Night 2026" from both LED screens (wall header, wall finale, cloud).
+- [x] Screen 1 header: stacked logo (crown above "George Steuart / HEALTH"), centred.
+- [x] Screen 1 photo wall: newest 25 as still circles on a 5 × 5 grid; a newcomer replaces the oldest in place; decorative rings with travelling pulses behind; name + department badges, exit sparks. `lib/wall/slots.ts` + `tests/unit/slots.test.ts` (replaces `lib/wall/grid.ts`).
+- [x] Final mode builds the crown from all attendees, not just the 25 on the wall.
+- [x] Screen 2: crown moved up, wordmark ~80% of stage width under it.
+
+**Done when:** Screen 1 never shows more than 25 photos, a new arrival takes the oldest person's spot and nobody else moves; final mode still shows everyone; neither screen shows the event title.
 
 ---
 

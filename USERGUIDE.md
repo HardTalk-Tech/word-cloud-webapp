@@ -83,16 +83,18 @@ If the phone can't connect, allow Node.js through Windows Firewall (Private netw
 
 URL: <http://localhost:3000/screen/dev/welcome?debug=1>
 
-- **Header:** crown + GEORGE STEUART on the left, **"N joined"** counter on the right.
-- **Photo wall:** every attendee's tile, spread evenly over the screen. The tiles shrink automatically as
-  more people join (capacity steps 60 → 150 → 300 → 500 → 750 → 1000).
-- **Idle glow:** every 2–3 s a random tile grows slightly with a red ring.
+- **Header:** the George Steuart Health logo (crown above the wordmark), centred.
+- **Photo wall:** the **25 most recent** arrivals as round photos on a 5 × 5 grid, filled in registration
+  order. Photos never move: from the 26th arrival on, the newcomer takes the spot of the oldest person on the
+  wall. Each photo has a badge with the first name and department. Faint rings with travelling lights run
+  behind the grid.
+- **Idle glow:** every 2–3 s a random circle grows slightly with a red ring.
 - **Welcome spotlight:** when someone registers, the wall dims, confetti fires, a big card shows
   *Welcome* + their name, then the photo flies into its spot on the wall.
   - Several arrivals queue up and are shown one by one (shorter holds when the queue is long).
   - More than 10 waiting → groups of up to 4 people at once.
 
-**Debug overlay (`?debug=1`):** fps, attendees, queue length, current phase, grid tier, mode, epoch,
+**Debug overlay (`?debug=1`):** fps, attendees, queue length, current phase, photos on the wall (n/25), mode, epoch,
 stage size and **synced** (yes = live data from the server). Remove `?debug=1` for the clean view.
 
 **How to trigger a spotlight:** register from the phone flow (section 3), or add fake people:
@@ -140,7 +142,7 @@ Other usernames are rejected unless added to `src/config/operators.ts`.
 |---|---|---|
 | **Event switcher** (top bar) | Switch between `dev` and `main` | Each event has separate data |
 | **Stats** | Register someone | Registered / Answered / rate / Hidden / last arrival update live |
-| **Mode: Live / Final crown** | Click **Final crown** | Screen 1: all photos fly into a crown shape. Screen 2: filler fades, crown calms. Click **Live** to go back |
+| **Mode: Live / Final crown** | Click **Final crown** | Screen 1: every attendee's photo (not just the 25 on the wall) forms a crown shape. Screen 2: filler fades, crown calms. Click **Live** to go back |
 | **Pause welcome spotlight** | Turn on, then register someone | Screen 1 skips the spotlight; the tile just pops into the wall. Turn off → queued welcomes play |
 | **Cloud spotlight question** | Click **Q1…Q5** | Screen 2 highlights that question's words, dims the rest, shows the question at the top. **All** to clear |
 | **Auto-rotate** | Turn on | Screen 2 cycles Q1→Q5 every 30 s |

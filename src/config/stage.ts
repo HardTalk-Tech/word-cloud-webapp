@@ -7,7 +7,22 @@ export const STAGE = {
 /** Canvas backing store = stage size x devicePixelRatio, capped. */
 export const MAX_DPR = 2;
 
-/** Main wall: top band reserved for the wordmark + live counter. */
-export const WALL_HEADER_RATIO = 0.08;
+/** Main wall: top band reserved for the stacked George Steuart Health logo. */
+export const WALL_HEADER_RATIO = 0.16;
 export const WALL_PADDING = 24;
-export const WALL_GAP = 4;
+
+/**
+ * Main wall: the newest attendees as round photos on a fixed 5 × 5 grid (25 on screen).
+ * Nobody moves: a new arrival takes a free spot, or the spot of the oldest person on the wall.
+ */
+export const WALL_GRID = {
+  cols: 5,
+  rows: 5,
+  /** Circle diameter as a share of its grid cell. */
+  fill: 0.82,
+} as const;
+
+/** Decorative rings behind the grid (radius × half the grid size); the outer ones run past the grid. */
+export const RING_PATTERN = {
+  radii: [0.42, 0.78, 1.1, 1.28],
+} as const;

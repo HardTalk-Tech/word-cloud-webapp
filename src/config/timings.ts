@@ -32,6 +32,10 @@ export const WALL = {
   sweepEveryMinMs: 20000,
   sweepEveryMaxMs: 30000,
   sweepMs: 1800,
+  /** The person replaced by a new arrival shrinks away in sparks. */
+  exitMs: 800,
+  /** Light pulses travelling round the decorative rings. */
+  orbitPulseMs: 9000,
 } as const;
 
 export const FINAL = {

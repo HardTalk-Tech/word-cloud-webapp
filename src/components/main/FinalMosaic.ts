@@ -1,4 +1,4 @@
-﻿// Final mode on Screen 1: every visible tile flies from the wall into the crown.
+﻿// Final mode on Screen 1: every visible attendee (on the rings or not) gathers into the crown.
 import { FINAL } from '@/config/timings';
 import { easeInOutCubic, lerpRect, progress, type Rect } from '@/lib/anim';
 import type { MaskGrid } from '@/lib/mask/mask';
@@ -80,6 +80,11 @@ export class FinalMosaic {
   isAnimating(now: number): boolean {
     if (this.state === 'in' || this.state === 'out') return true;
     return now - this.reflowAt < REFLOW_MS;
+  }
+
+  /** The tile's cell in the crown, if it is part of the mosaic. */
+  cell(id: string): Rect | undefined {
+    return this.cells.get(id);
   }
 
   /** Where to draw a tile, given its wall rect. null = not part of the mosaic (draw normally). */

@@ -1,21 +1,16 @@
-// Screen 1 engine: data → queue → one rAF loop drawing wall, spotlight and final mosaic.
+// Screen 1 engine: data → queue → one rAF loop drawing the photo wall, spotlight and final mosaic.
+// The wall shows only the newest 25 attendees on a fixed 5 × 5 grid; everyone is kept for the final crown.
 import { BRAND } from '@/config/brand';
-import { STAGE, WALL_GAP } from '@/config/stage';
+import { STAGE } from '@/config/stage';
 import { SPOTLIGHT, WALL } from '@/config/timings';
 import { progress, type Rect } from '@/lib/anim';
 import { ensureFonts, fontFamilies, type FontFamilies } from '@/lib/fonts';
 import { ImageCache } from '@/lib/images/cache';
 import { containRect, loadMask } from '@/lib/mask/mask';
-import { chooseTier, computeWall, type WallLayout } from '@/lib/wall/grid';
 import { catchUpIds, enqueue, initialQueue, removeId, tick, type QueueState } from '@/lib/wall/queue';
+import { assignSlots, gridCapacity, gridSlot, wallWindow } from '@/lib/wall/slots';
 import { DEFAULT_CONTROL, type Attendee, type ControlState, type WallAttendee } from '@/types/models';
-import {
-  drawEventTitle,
-  drawWordmark,
-  loadBrandImages,
-  setupCanvas,
-  type BrandImages,
-} from '@/components/stage/canvas';
+import { NO_BRAND_IMAGES, drawWordmark, loadBrandImages, setupCanvas, type BrandImages } from '@/components/stage/canvas';
 import type { DebugStats } from '@/components/stage/DebugOverlay';
 import { FinalMosaic } from './FinalMosaic';
 import { SpotlightRenderer, type SpotPerson } from './SpotlightRenderer';
@@ -23,15 +18,17 @@ import {
   WALL_AREA,
   WallSprites,
   drawBackground,
-  drawGlassLayer,
+  drawExitSparks,
   drawGlowTile,
   drawHeader,
   drawLandGlow,
+  drawNameTag,
   drawRing,
+  drawRingPattern,
   drawSweep,
   drawTile,
   drawWatermark,
-  isTileAnimating,
+  leaveMs,
   tileFx,
   tileRect,
   type TileState,
@@ -39,15 +36,12 @@ import {
 
 const W = STAGE.width;
 const H = STAGE.height;
-const MOVE_MS = 700;
+const CAPACITY = gridCapacity();
 /** Crown area for the final mosaic; the wordmark sits below it. */
 const FINAL_BOX: Rect = { x: W * 0.05, y: H * 0.04, w: W * 0.9, h: H * 0.76 };
-const FINAL_WORDMARK_Y = H * 0.87;
-const FINAL_TITLE_Y = H * 0.95;
-/** When only the slow new-arrival rings are fading, redraw at this interval instead of every frame. */
-const SLOW_REDRAW_MS = 100;
+const FINAL_WORDMARK_Y = H * 0.9;
+const FINAL_WORDMARK_W = W * 0.62;
 
-type Tile = TileState & { visible: boolean };
 type Stored = { epoch: number; lastAt: number };
 
 const storeKey = (eventId: string) => `ew:main:${eventId}`;
@@ -66,6 +60,8 @@ function toWall(a: Attendee): WallAttendee | null {
   };
 }
 
+const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? '';
+
 export class MainEngine {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly fonts: FontFamilies;
@@ -83,30 +79,32 @@ export class MainEngine {
   private queue: QueueState = initialQueue();
   private control: ControlState = DEFAULT_CONTROL;
   private controlLoaded = false;
-  private layout: WallLayout = computeWall(0, WALL_AREA, WALL_GAP);
-  private tiles = new Map<string, Tile>();
   private shownWhilePaused = new Set<string>();
 
-  private brand: BrandImages = { crown: null, wordmark: null };
+  /** Who is on the wall → their grid spot. Spots never change while someone is on the wall. */
+  private slots = new Map<string, number>();
+  /** null until the first window is placed (an empty wall is a window too). */
+  private windowKey: string | null = null;
+  /** The first window after load is history: placed without animation. */
+  private windowPrimed = false;
+  /** Tiles on the wall, plus ones still animating off it. */
+  private tiles = new Map<string, TileState>();
+
+  private brand: BrandImages = NO_BRAND_IMAGES;
   private watermarkRect: Rect | null = null;
   /** Where the crown sits in final mode: the faint crown is drawn here behind the photo mosaic. */
   private finalCrownRect: Rect | null = null;
 
   private readonly sprites = new WallSprites();
-  /** Every slot as a glass cell; photos are drawn on top. Rebuilt when the grid changes. */
-  private glassLayer: HTMLCanvasElement | null = null;
   /** New arrivals → when they appeared (soft red ring fading over WALL.newArrivalMs). */
   private recent = new Map<string, number>();
   private sweepAt = -Infinity;
   private nextSweepAt = 0;
-  private lastDrawAt = 0;
 
   private ambient: { id: string; start: number } | null = null;
   private nextAmbientAt = 0;
   private dirty = true;
-  private tilesAnimating = false;
   private visibleIdsKey = '';
-  private visibleCount = 0;
 
   private raf = 0;
   private destroyed = false;
@@ -127,7 +125,6 @@ export class MainEngine {
       this.dirty = true;
     });
     this.spot = new SpotlightRenderer(this.fonts, confettiCanvas);
-    this.glassLayer = this.sprites.glassLayer(this.layout.slots);
     this.nextSweepAt = performance.now() + WALL.sweepEveryMinMs;
   }
 
@@ -136,7 +133,7 @@ export class MainEngine {
     if (this.destroyed) return;
     this.brand = brand;
     if (brand.crown) {
-      // Watermark: the real crown, centred in the wall area.
+      // Watermark: the real crown, centred behind the rings.
       this.watermarkRect = containRect(brand.crown.naturalWidth, brand.crown.naturalHeight, {
         x: WALL_AREA.x + WALL_AREA.w * 0.1,
         y: WALL_AREA.y + WALL_AREA.h * 0.1,
@@ -151,6 +148,8 @@ export class MainEngine {
       if (this.destroyed) return;
       this.final.setMask(m.grid);
       this.finalCrownRect = m.rect;
+      // Reloaded in final mode: lay the mosaic out again now that the crown is known.
+      this.visibleIdsKey = '';
     } catch (e) {
       console.warn('Crown mask failed to load', e);
     }
@@ -189,16 +188,10 @@ export class MainEngine {
   }
 
   onAttendees(list: Attendee[], fromCache: boolean) {
-    const now = performance.now();
-    // Everyone in the snapshot that initialises the wall is history: show them without a pop / ring.
-    const wasInitialised = this.initialised;
     const next = list.map(toWall).filter((a): a is WallAttendee => a !== null && !this.stale.has(a.id));
     const ids = new Set(next.map((a) => a.id));
     for (const id of this.attendees.keys()) {
-      if (!ids.has(id)) {
-        this.queue = removeId(this.queue, id);
-        this.tiles.delete(id);
-      }
+      if (!ids.has(id)) this.queue = removeId(this.queue, id);
     }
     this.attendees = new Map(next.map((a) => [a.id, a]));
     this.order = next.map((a) => a.id);
@@ -223,13 +216,13 @@ export class MainEngine {
       }
     }
 
+    // Everyone's small tile (the final crown uses them all); lqip until it decodes.
     for (const a of next) {
       if (a.hidden) continue;
       void this.cache.load(a.lqip);
       void this.cache.load(a.tileUrl);
     }
     this.preloadSpots();
-    this.relayout(now, !wasInitialised);
     this.dirty = true;
   }
 
@@ -261,9 +254,9 @@ export class MainEngine {
     this.attendees.clear();
     this.order = [];
     this.tiles.clear();
+    this.slots = new Map();
+    this.windowKey = '';
     this.recent.clear();
-    this.layout = computeWall(0, WALL_AREA, WALL_GAP);
-    this.glassLayer = this.sprites.glassLayer(this.layout.slots);
     this.spot.reset();
     try {
       localStorage.removeItem(storeKey(this.eventId));
@@ -272,43 +265,60 @@ export class MainEngine {
     }
   }
 
+  /** Spotlight photos: the next people up, and everyone on the wall (the circles are bigger than a tile). */
   private preloadSpots() {
-    const ids = [...this.queue.current, ...this.queue.queue.slice(0, 8)];
+    const ids = [...this.queue.current, ...this.queue.queue.slice(0, 8), ...this.slots.keys()];
     for (const id of ids) {
       const a = this.attendees.get(id);
       if (a) void this.cache.load(a.spotUrl, true);
     }
   }
 
-  private relayout(now: number, instant: boolean) {
-    const count = this.order.length;
-    const tierChanged = chooseTier(count) !== this.layout.tier;
-    if (tierChanged) {
-      this.layout = computeWall(count, WALL_AREA, WALL_GAP);
-      this.glassLayer = this.sprites.glassLayer(this.layout.slots);
-    }
-    this.order.forEach((id, i) => {
-      const slot = this.layout.slots[i];
-      const t = this.tiles.get(id);
-      if (!t) {
-        const a = this.attendees.get(id)!;
-        this.tiles.set(id, {
-          from: slot,
-          to: slot,
-          moveStart: -Infinity,
-          moveMs: 0,
-          appearAt: now,
-          appear: 'none',
-          hideAt: null,
-          visible: instant && this.isVisible(a),
-        });
-      } else if (t.to.x !== slot.x || t.to.y !== slot.y || t.to.w !== slot.w) {
-        t.from = tileRect(t, now);
-        t.to = slot;
-        t.moveStart = now;
-        t.moveMs = tierChanged ? WALL.tierChangeMs : MOVE_MS;
-      }
+  // ── Photo wall ──────────────────────────────────────────────────────
+
+  /** Newest 25 on the wall, including whoever is flying in from the spotlight right now. */
+  private computeWindow(): string[] {
+    const flying = this.queue.phase === 'SPOT_FLY' ? this.queue.current : [];
+    const ids = this.order.filter((id) => {
+      const a = this.attendees.get(id);
+      if (!a || a.hidden) return false;
+      return this.isVisible(a) || flying.includes(id);
     });
+    return wallWindow(ids, CAPACITY);
+  }
+
+  /** Window changed: newcomers take a free spot (or the oldest person's); nobody else moves. */
+  private applyWindow(window: string[], now: number) {
+    const key = window.join(',');
+    if (key === this.windowKey) return;
+    const instant = !this.windowPrimed;
+    this.windowPrimed = true;
+    this.windowKey = key;
+    this.slots = assignSlots(this.slots, window, CAPACITY);
+
+    for (const [id, t] of this.tiles) {
+      if (this.slots.has(id) || t.leaveAt !== null) continue;
+      if (instant) {
+        this.tiles.delete(id);
+        continue;
+      }
+      const a = this.attendees.get(id);
+      t.leaveAt = now;
+      t.leave = a && !a.hidden ? 'exit' : 'hide';
+      this.recent.delete(id);
+      if (this.ambient?.id === id) this.ambient = null;
+    }
+
+    for (const [id, slot] of this.slots) {
+      const t = this.tiles.get(id);
+      if (t && t.leaveAt === null) continue;
+      // New on the wall. Spotlight arrivals are drawn by the flying card until they land.
+      const flying = this.queue.current.includes(id);
+      const pop = !instant && !flying;
+      this.tiles.set(id, { slot, appearAt: now, appear: pop ? 'pop' : 'none', leaveAt: null, leave: 'exit' });
+      if (pop && this.initialised) this.markRecent(id, now);
+    }
+    this.preloadSpots();
   }
 
   // ── Frame ───────────────────────────────────────────────────────────
@@ -361,6 +371,7 @@ export class MainEngine {
       if (t) {
         t.appear = 'land';
         t.appearAt = now;
+        this.markRecent(id, now);
       }
       const a = this.attendees.get(id);
       if (a) lastAt = Math.max(lastAt, a.createdAtMs);
@@ -385,6 +396,8 @@ export class MainEngine {
       this.queue = r.state;
       this.dirty = true;
     }
+    // Before the first server snapshot the wall waits (so history is placed, not animated in).
+    if (this.initialised) this.applyWindow(this.computeWindow(), now);
     for (const e of r.events) {
       if (e.type === 'start') {
         this.spot.takeSnapshot(this.canvas);
@@ -395,32 +408,37 @@ export class MainEngine {
       }
     }
     this.final.tick(now);
+    for (const [id, t] of this.tiles) {
+      if (t.leaveAt !== null && now - t.leaveAt >= leaveMs(t)) this.tiles.delete(id);
+    }
 
     const idle = this.queue.phase === 'WALL_IDLE';
-    const ambientActive = this.ambient !== null || (!this.final.active && idle && now >= this.nextAmbientAt);
     // Light sweep every 20–30 s while nothing else is on screen.
     if (idle && now >= this.nextSweepAt && now - this.sweepAt > WALL.sweepMs) {
       this.sweepAt = now;
       this.nextSweepAt = now + WALL.sweepEveryMinMs + Math.random() * (WALL.sweepEveryMaxMs - WALL.sweepEveryMinMs);
     }
-    const sweeping = now - this.sweepAt < WALL.sweepMs;
     for (const [id, at] of this.recent) if (now - at >= WALL.newArrivalMs) this.recent.delete(id);
 
-    const fast =
-      !idle || this.final.isAnimating(now) || this.tilesAnimating || ambientActive || sweeping;
-    const slow = this.recent.size > 0 && now - this.lastDrawAt >= SLOW_REDRAW_MS;
-    if (!this.dirty && !fast && !slow) return;
+    // The ring pattern keeps moving; only a settled final crown can skip frames.
+    const settledFinal = this.final.state === 'on' && !this.final.isAnimating(now) && idle;
+    if (settledFinal && !this.dirty) return;
     this.draw(now);
-    this.lastDrawAt = now;
     this.drawn++;
     this.dirty = false;
+  }
+
+  /** Best decoded image for a wall circle: the spotlight photo once it is in (circles are bigger than a tile). */
+  private image(a: WallAttendee): HTMLImageElement | null {
+    return this.cache.get(a.spotUrl) ?? this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
   }
 
   private draw(now: number) {
     const ctx = this.ctx;
     drawBackground(ctx);
     const fin = this.final.amount(now);
-    drawWatermark(ctx, this.brand.crown, this.watermarkRect, 1 - fin);
+    const wallA = 1 - fin;
+    drawWatermark(ctx, this.brand.crown, this.watermarkRect, wallA);
     // Final mode: the real crown, faint, behind the photo mosaic so the design reads through it.
     if (fin > 0 && this.brand.crown && this.finalCrownRect) {
       const r = this.finalCrownRect;
@@ -429,55 +447,57 @@ export class MainEngine {
       ctx.drawImage(this.brand.crown, r.x, r.y, r.w, r.h);
       ctx.restore();
     }
-    drawHeader(ctx, this.fonts, this.brand, 1 - fin);
+    drawHeader(ctx, this.fonts, this.brand, wallA);
 
+    const visible = this.final.active ? this.visibleIds() : [];
     if (this.final.active) {
-      const ids = this.visibleIds();
-      const key = ids.join(',');
+      const key = visible.join(',');
       if (key !== this.visibleIdsKey) {
         this.visibleIdsKey = key;
-        this.final.update(ids, now, (id) => {
+        this.final.update(visible, now, (id) => {
           const t = this.tiles.get(id);
-          return t ? tileRect(t, now) : null;
+          return t ? tileRect(t) : null;
         });
       }
     }
 
-    // Empty slots as dim glass cells (the wall looks complete from the first minute).
-    drawGlassLayer(ctx, this.glassLayer, 1 - fin);
-
-    // Pass 1: visibility changes + where each tile is this frame.
-    const drawList: { id: string; t: Tile; rect: Rect; sprite: HTMLCanvasElement | null }[] = [];
-    let anim = false;
-    for (const id of this.order) {
-      const a = this.attendees.get(id);
-      const t = this.tiles.get(id);
-      if (!a || !t) continue;
-      const vis = this.isVisible(a);
-      if (vis && !t.visible) {
-        t.visible = true;
-        t.hideAt = null;
-        if (!(t.appear === 'land' && now - t.appearAt < 50)) {
-          t.appear = 'pop';
-          t.appearAt = now;
-        }
-        if (this.initialised) this.markRecent(id, now);
-      } else if (!vis && t.visible) {
-        t.visible = false;
-        t.hideAt = a.hidden ? now : null;
-        this.recent.delete(id);
+    // Ring pattern + empty spots as dim glass circles (the wall looks complete from the first minute).
+    drawRingPattern(ctx, this.sprites, now, wallA);
+    if (wallA > 0) {
+      const taken = new Set(this.slots.values());
+      for (let slot = 0; slot < CAPACITY; slot++) {
+        if (!taken.has(slot)) drawTile(ctx, null, this.sprites, gridSlot(slot, WALL_AREA), 1, wallA);
       }
-      const fading = t.hideAt !== null && now - t.hideAt < WALL.hideFadeMs;
-      if (!t.visible && !fading) continue;
-      const wallR = tileRect(t, now);
-      const rect = this.final.rect(id, wallR, now) ?? wallR;
-      const img = this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
-      drawList.push({ id, t, rect, sprite: this.sprites.tile(img) });
-      if (!anim && isTileAnimating(t, now)) anim = true;
     }
-    this.tilesAnimating = anim;
 
-    // Pass 2: red flash in the slot where a photo just landed / popped in (under the tile).
+    // Pass 1: where each tile is this frame. Spotlit people are drawn by the spotlight card instead.
+    const drawList: { id: string; t: TileState; rect: Rect; sprite: HTMLCanvasElement | null }[] = [];
+    for (const [id, t] of this.tiles) {
+      const a = this.attendees.get(id);
+      if (!a || this.queue.current.includes(id)) continue;
+      const wallR = tileRect(t);
+      const rect = t.leaveAt === null ? (this.final.rect(id, wallR, now) ?? wallR) : wallR;
+      drawList.push({ id, t, rect, sprite: this.sprites.tile(this.image(a)) });
+    }
+    // Final mode: everyone not on the wall grows out of their crown cell.
+    for (const id of visible) {
+      if (this.tiles.has(id)) continue;
+      const cell = this.final.cell(id);
+      const a = this.attendees.get(id);
+      if (!cell || !a) continue;
+      const point = { x: cell.x + cell.w / 2, y: cell.y + cell.h / 2, w: 0, h: 0 };
+      const rect = this.final.rect(id, point, now) ?? point;
+      if (rect.w < 1) continue;
+      const img = this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
+      drawList.push({
+        id,
+        t: { slot: CAPACITY, appearAt: -Infinity, appear: 'none', leaveAt: null, leave: 'exit' },
+        rect,
+        sprite: this.sprites.tile(img),
+      });
+    }
+
+    // Pass 2: red flash where a photo just landed / popped in (under the tile).
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const d of drawList) {
@@ -487,42 +507,39 @@ export class MainEngine {
     }
     ctx.restore();
 
-    // Pass 3: rounded photo tiles.
-    const visibleList: string[] = [];
+    // Pass 3: round photo tiles; someone being replaced bursts into sparks.
     for (const d of drawList) {
-      if (d.t.visible) visibleList.push(d.id);
       if (this.ambient?.id === d.id) continue;
       const fx = tileFx(d.t, now);
       drawTile(ctx, d.sprite, this.sprites, d.rect, fx.scale, fx.alpha);
+      if (d.t.leave === 'exit' && d.t.leaveAt !== null) {
+        drawExitSparks(ctx, this.sprites, d.rect, progress(now, d.t.leaveAt, WALL.exitMs), d.t.leaveAt % 6.28);
+      }
     }
-    this.visibleCount = visibleList.length;
 
     // Pass 4: soft red ring on the newest arrivals, fading out.
     if (this.recent.size && fin < 1) {
       ctx.save();
       for (const d of drawList) {
         const at = this.recent.get(d.id);
-        if (at === undefined || !d.t.visible) continue;
+        if (at === undefined || d.t.leaveAt !== null) continue;
         const p = (now - at) / WALL.newArrivalMs;
-        drawRing(ctx, this.sprites, d.rect, (1 - p) ** 1.5 * (1 - fin));
+        drawRing(ctx, this.sprites, d.rect, (1 - p) ** 1.5 * wallA * tileFx(d.t, now).alpha);
       }
       ctx.restore();
     }
 
-    // Ambient glow on one random tile.
+    // Ambient glow on one random circle.
     if (!this.final.active && this.queue.phase === 'WALL_IDLE') {
-      if (!this.ambient && now >= this.nextAmbientAt && visibleList.length) {
-        this.ambient = { id: visibleList[Math.floor(Math.random() * visibleList.length)], start: now };
+      const settled = drawList.filter((d) => d.t.leaveAt === null && d.t.slot < CAPACITY);
+      if (!this.ambient && now >= this.nextAmbientAt && settled.length) {
+        this.ambient = { id: settled[Math.floor(Math.random() * settled.length)].id, start: now };
       }
       if (this.ambient) {
         const p = progress(now, this.ambient.start, WALL.ambientDurationMs);
-        const a = this.attendees.get(this.ambient.id);
-        const t = this.tiles.get(this.ambient.id);
-        if (a && t && t.visible) {
-          const img = this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
-          drawGlowTile(ctx, this.sprites.tile(img), this.sprites, tileRect(t, now), p);
-        }
-        if (p >= 1 || !a || !t?.visible) {
+        const d = drawList.find((x) => x.id === this.ambient?.id);
+        if (d) drawGlowTile(ctx, d.sprite, this.sprites, d.rect, p);
+        if (p >= 1 || !d) {
           this.ambient = null;
           this.nextAmbientAt =
             now + WALL.ambientEveryMinMs + Math.random() * (WALL.ambientEveryMaxMs - WALL.ambientEveryMinMs);
@@ -532,7 +549,17 @@ export class MainEngine {
       this.ambient = null;
     }
 
-    // Diagonal shine across the photos and glass cells.
+    // Name + department badge on every circle.
+    if (wallA > 0) {
+      for (const d of drawList) {
+        if (d.t.leaveAt !== null || d.t.slot >= CAPACITY) continue;
+        const a = this.attendees.get(d.id);
+        if (!a) continue;
+        drawNameTag(ctx, this.sprites, this.fonts, d.rect, firstName(a.name), a.department, wallA * tileFx(d.t, now).alpha);
+      }
+    }
+
+    // Diagonal shine across the photos and glass circles.
     if (this.queue.phase === 'WALL_IDLE') drawSweep(ctx, this.sprites, (now - this.sweepAt) / WALL.sweepMs);
 
     if (fin > 0) {
@@ -540,14 +567,14 @@ export class MainEngine {
         x: W / 2,
         y: FINAL_WORDMARK_Y,
         // Wordmark only: the photo mosaic is the crown.
-        height: 70 + 8 * fin,
+        width: FINAL_WORDMARK_W * (0.96 + 0.04 * fin),
+        height: 70,
         align: 'center',
         fonts: this.fonts,
         brand: this.brand,
         crown: false,
         alpha: fin,
       });
-      drawEventTitle(ctx, { x: W / 2, y: FINAL_TITLE_Y, size: 28, align: 'center', fonts: this.fonts, alpha: fin });
     }
 
     if (this.queue.phase !== 'WALL_IDLE') {
@@ -557,7 +584,7 @@ export class MainEngine {
         const a = this.attendees.get(id);
         const t = this.tiles.get(id);
         const img = a ? (this.cache.get(a.spotUrl) ?? this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null) : null;
-        return { id, name: a?.name ?? '', department: a?.department ?? '', img, target: t ? tileRect(t, now) : null };
+        return { id, name: a?.name ?? '', department: a?.department ?? '', img, target: t ? tileRect(t) : null };
       });
       this.spot.draw(ctx, q.phase, progress(now, q.phaseStartedAt, dur), people);
     }
@@ -589,10 +616,9 @@ export class MainEngine {
       fps: this.fps,
       'drawn fps': this.drawFps,
       attendees: this.order.length,
-      visible: this.visibleCount,
+      'on wall': `${this.slots.size}/${CAPACITY}`,
       queue: this.queue.queue.length,
       phase: this.queue.phase,
-      tier: `${this.layout.tier} (${this.layout.cols}×${this.layout.rows}, ${this.layout.size}px)`,
       images: this.cache.size,
       mode: `${this.control.mode}${this.control.welcomePaused ? ' (paused)' : ''} · final ${this.final.state}`,
       epoch: this.control.epoch,
