@@ -84,12 +84,12 @@ If the phone can't connect, allow Node.js through Windows Firewall (Private netw
 URL: <http://localhost:3000/screen/dev/welcome?debug=1>
 
 - **Header:** the George Steuart Health logo (crown above the wordmark), centred.
-- **Ring wall:** the **25 most recent** arrivals as round photos: one big circle in the centre (newest),
-  8 on the inner ring, 16 on the outer ring. Each new arrival takes the centre and everyone moves one place
-  outward; the oldest leaves the outer ring. The rings turn slowly and light pulses travel round them.
+- **Photo wall:** the **25 most recent** arrivals as round photos on a 5 × 5 grid, filled in registration
+  order. Photos never move: from the 26th arrival on, the newcomer takes the spot of the oldest person on the
+  wall. Faint rings with travelling lights run behind the grid.
 - **Idle glow:** every 2–3 s a random circle grows slightly with a red ring.
 - **Welcome spotlight:** when someone registers, the wall dims, confetti fires, a big card shows
-  *Welcome* + their name, then the photo flies into the centre circle.
+  *Welcome* + their name, then the photo flies into its spot on the wall.
   - Several arrivals queue up and are shown one by one (shorter holds when the queue is long).
   - More than 10 waiting → groups of up to 4 people at once.
 
@@ -141,7 +141,7 @@ Other usernames are rejected unless added to `src/config/operators.ts`.
 |---|---|---|
 | **Event switcher** (top bar) | Switch between `dev` and `main` | Each event has separate data |
 | **Stats** | Register someone | Registered / Answered / rate / Hidden / last arrival update live |
-| **Mode: Live / Final crown** | Click **Final crown** | Screen 1: every attendee's photo (not just the 25 on the rings) forms a crown shape. Screen 2: filler fades, crown calms. Click **Live** to go back |
+| **Mode: Live / Final crown** | Click **Final crown** | Screen 1: every attendee's photo (not just the 25 on the wall) forms a crown shape. Screen 2: filler fades, crown calms. Click **Live** to go back |
 | **Pause welcome spotlight** | Turn on, then register someone | Screen 1 skips the spotlight; the tile just pops into the wall. Turn off → queued welcomes play |
 | **Cloud spotlight question** | Click **Q1…Q5** | Screen 2 highlights that question's words, dims the rest, shows the question at the top. **All** to clear |
 | **Auto-rotate** | Turn on | Screen 2 cycles Q1→Q5 every 30 s |

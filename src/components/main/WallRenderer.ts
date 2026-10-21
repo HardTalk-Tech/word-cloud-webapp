@@ -1,12 +1,12 @@
-// Ring wall drawing: logo header, faint crown watermark, orbit lines, round photo tiles with
-// pop / land / glow / shift / exit, new-arrival rings, name tags and the light sweep. Everything with
+// Photo wall drawing: logo header, faint crown watermark, decorative rings, round photo tiles on a
+// fixed 5 × 5 grid with pop / land / glow / exit, new-arrival rings, name tags and the light sweep. Everything with
 // gradients or clips is pre-rendered into sprites, so a frame is mostly drawImage calls.
 import { BRAND } from '@/config/brand';
-import { RING_WALL, STAGE } from '@/config/stage';
+import { RING_PATTERN, STAGE } from '@/config/stage';
 import { WALL } from '@/config/timings';
-import { clamp, easeInCubic, easeInOutCubic, easeOutBack, easeOutCubic, progress, type Rect } from '@/lib/anim';
+import { clamp, easeInOutCubic, easeOutBack, easeOutCubic, progress, type Rect } from '@/lib/anim';
 import type { FontFamilies } from '@/lib/fonts';
-import { HEADER_H, WALL_AREA, lerpPose, poseRect, ringPose, type Pose } from '@/lib/wall/rings';
+import { HEADER_H, WALL_AREA, gridBox, gridSlot } from '@/lib/wall/slots';
 import {
   clearStage,
   drawLogo,
@@ -27,16 +27,12 @@ const RIM = 0.035;
 const TAU = Math.PI * 2;
 
 export type TileState = {
-  /** Slot on the rings (0 = centre). */
+  /** Grid spot (0–24, reading order). Never changes while the person is on the wall. */
   slot: number;
-  /** Start pose of the current glide: blend of two slots' poses (they keep turning with the rings). */
-  from: { a: number; b: number; mix: number } | null;
-  /** May be in the future: the shift ripples outward ring by ring. */
-  shiftStart: number;
   /** When the tile became visible on the wall, and how. */
   appearAt: number;
   appear: 'none' | 'pop' | 'land';
-  /** Left the wall: pushed off the end ('exit') or hidden / deleted ('hide'). */
+  /** Left the wall: replaced by a new arrival ('exit') or hidden / deleted ('hide'). */
   leaveAt: number | null;
   leave: 'exit' | 'hide';
 };
@@ -45,27 +41,11 @@ export function leaveMs(t: TileState): number {
   return t.leave === 'exit' ? WALL.exitMs : WALL.hideFadeMs;
 }
 
-/** 0..1 through the current glide (1 = settled). */
-export function shiftProgress(t: TileState, now: number): number {
-  return t.from ? easeInOutCubic(progress(now, t.shiftStart, WALL.shiftMs)) : 1;
+export function tileRect(t: TileState): Rect {
+  return gridSlot(t.slot, WALL_AREA);
 }
 
-export function tilePose(t: TileState, now: number): Pose {
-  const to = ringPose(t.slot, WALL_AREA, now);
-  const p = shiftProgress(t, now);
-  if (!t.from || p >= 1) return to;
-  const from = lerpPose(ringPose(t.from.a, WALL_AREA, now), ringPose(t.from.b, WALL_AREA, now), t.from.mix);
-  return lerpPose(from, to, p);
-}
-
-export function tileRect(t: TileState, now: number): Rect {
-  const pose = tilePose(t, now);
-  // Leaving the wall: drift outward past the outer ring.
-  const spread = t.leave === 'exit' && t.leaveAt !== null ? 1 + 0.16 * easeInCubic(progress(now, t.leaveAt, WALL.exitMs)) : 1;
-  return poseRect(pose, WALL_AREA, spread);
-}
-
-/** Scale + alpha for appear / shift / leave animations. */
+/** Scale + alpha for appear / leave animations. */
 export function tileFx(t: TileState, now: number): { scale: number; alpha: number } {
   let scale = 1;
   let alpha = 1;
@@ -77,9 +57,6 @@ export function tileFx(t: TileState, now: number): { scale: number; alpha: numbe
     const p = progress(now, t.appearAt, WALL.landBounceMs);
     scale = 1 + 0.14 * Math.sin(Math.PI * p) * (1 - p);
   }
-  // Ripple: a small swell while gliding to the next slot.
-  const s = shiftProgress(t, now);
-  if (s > 0 && s < 1) scale *= 1 + 0.05 * Math.sin(Math.PI * s);
   if (t.leaveAt !== null) {
     const p = progress(now, t.leaveAt, leaveMs(t));
     alpha *= 1 - p;
@@ -221,56 +198,46 @@ export function drawHeader(ctx: CanvasRenderingContext2D, fonts: FontFamilies, b
 }
 
 /**
- * Thin orbit lines for the inner and outer rings, each with a couple of light pulses travelling round
- * (the outer ring the other way), so the wall keeps moving even between arrivals.
+ * Background pattern: concentric rings centred on the grid (the outer ones run past it), each with a
+ * couple of light pulses travelling round. Only the pattern moves; the photos stay put.
  */
-export function drawOrbits(ctx: CanvasRenderingContext2D, sprites: WallSprites, now: number, alpha: number) {
+export function drawRingPattern(ctx: CanvasRenderingContext2D, sprites: WallSprites, now: number, alpha: number) {
   if (alpha <= 0) return;
-  const cx = WALL_AREA.x + WALL_AREA.w / 2;
-  const cy = WALL_AREA.y + WALL_AREA.h / 2;
+  const box = gridBox(WALL_AREA);
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  const half = box.w / 2;
   ctx.save();
-  for (let ring = 1; ring < RING_WALL.rings.length; ring++) {
-    const rx = RING_WALL.radiusX[ring] * (WALL_AREA.w / 2);
-    const ry = RING_WALL.radiusY[ring] * (WALL_AREA.h / 2);
-    ctx.globalAlpha = 0.22 * alpha;
-    ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.rect(0, WALL_AREA.y - 8, STAGE.width, STAGE.height - WALL_AREA.y + 8);
+  ctx.clip();
+  RING_PATTERN.radii.forEach((k, i) => {
+    ctx.globalAlpha = (i % 2 ? 0.16 : 0.24) * alpha;
+    ctx.lineWidth = i % 2 ? 1.5 : 2.5;
     ctx.strokeStyle = BRAND.red;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU);
+    ctx.arc(cx, cy, half * k, 0, TAU);
     ctx.stroke();
-  }
+  });
   ctx.globalCompositeOperation = 'lighter';
-  for (let ring = 1; ring < RING_WALL.rings.length; ring++) {
-    const rx = RING_WALL.radiusX[ring] * (WALL_AREA.w / 2);
-    const ry = RING_WALL.radiusY[ring] * (WALL_AREA.h / 2);
-    const dir = ring % 2 ? 1 : -1;
+  RING_PATTERN.radii.forEach((k, ring) => {
+    const r = half * k;
+    const dir = ring % 2 ? -1 : 1;
+    // Same speed along every ring, so the outer pulses take longer to go round.
+    const speed = (TAU / WALL.orbitPulseMs) * (RING_PATTERN.radii[0] / k);
     for (let i = 0; i < 2; i++) {
-      const a = dir * (now / WALL.orbitPulseMs) * TAU + i * Math.PI + ring;
-      const x = cx + Math.cos(a) * rx;
-      const y = cy + Math.sin(a) * ry;
+      const a = dir * now * speed + i * Math.PI + ring * 1.3;
       // Short comet: a bright head and a fading tail.
       for (let j = 0; j < 6; j++) {
-        const ta = a - dir * j * 0.035;
+        const ta = a - dir * j * (0.035 / k);
         const size = 30 - j * 4;
-        ctx.globalAlpha = alpha * 0.8 * (1 - j / 6);
-        ctx.drawImage(sprites.spark, cx + Math.cos(ta) * rx - size / 2, cy + Math.sin(ta) * ry - size / 2, size, size);
+        ctx.globalAlpha = alpha * 0.75 * (1 - j / 6);
+        ctx.drawImage(sprites.spark, cx + Math.cos(ta) * r - size / 2, cy + Math.sin(ta) * r - size / 2, size, size);
       }
-      ctx.globalAlpha = alpha * 0.5;
-      ctx.drawImage(sprites.glow, x - 28, y - 28, 56, 56);
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.drawImage(sprites.glow, cx + Math.cos(a) * r - 28, cy + Math.sin(a) * r - 28, 56, 56);
     }
-  }
-  ctx.restore();
-}
-
-/** Slow breathing red halo behind the centre (newest) circle. */
-export function drawCentreHalo(ctx: CanvasRenderingContext2D, sprites: WallSprites, r: Rect, now: number, alpha: number) {
-  if (alpha <= 0) return;
-  const k = 0.5 + 0.5 * Math.sin((now / WALL.haloMs) * TAU);
-  const size = r.w * (1.55 + 0.12 * k);
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = alpha * (0.35 + 0.25 * k);
-  ctx.drawImage(sprites.glow, r.x + r.w / 2 - size / 2, r.y + r.h / 2 - size / 2, size, size);
+  });
   ctx.restore();
 }
 
@@ -303,7 +270,7 @@ export function drawLandGlow(ctx: CanvasRenderingContext2D, sprites: WallSprites
   ctx.drawImage(sprites.glow, r.x + r.w / 2 - size / 2, r.y + r.h / 2 - size / 2, size, size);
 }
 
-/** The oldest circle leaving: a few sparks fly outward from it. p = 0..1 over the exit. */
+/** A circle being replaced: a few sparks fly outward from it. p = 0..1 over the exit. */
 export function drawExitSparks(ctx: CanvasRenderingContext2D, sprites: WallSprites, r: Rect, p: number, seed: number) {
   if (p <= 0 || p >= 1) return;
   const cx = r.x + r.w / 2;
@@ -339,7 +306,7 @@ export function drawGlowTile(
   p: number,
 ) {
   const k = Math.sin(Math.PI * clamp(p, 0, 1));
-  const scale = 1 + 0.18 * k;
+  const scale = 1 + 0.08 * k;
   const w = r.w * scale;
   const grown = { x: r.x + (r.w - w) / 2, y: r.y + (r.w - w) / 2, w, h: w };
   ctx.save();
@@ -352,10 +319,7 @@ export function drawGlowTile(
   ctx.restore();
 }
 
-/**
- * Name on a dark pill across the bottom of a circle. `detail` (department) adds a smaller second line
- * (centre circle only).
- */
+/** Name on a dark pill across the bottom of a circle. `detail` (department) adds a smaller second line. */
 export function drawNameTag(
   ctx: CanvasRenderingContext2D,
   fonts: FontFamilies,

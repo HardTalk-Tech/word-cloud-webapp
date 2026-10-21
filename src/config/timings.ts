@@ -32,20 +32,9 @@ export const WALL = {
   sweepEveryMinMs: 20000,
   sweepEveryMaxMs: 30000,
   sweepMs: 1800,
-  /** Ring wall: everyone glides one slot outward when someone new arrives. */
-  shiftMs: 900,
-  /** Shift starts ring by ring (centre first) so the move ripples outward. */
-  rippleDelayMs: 140,
-  /** The oldest circle drifts out and dissolves when pushed off the wall. */
-  exitMs: 900,
-  /** One full turn per ring (ms); negative = anticlockwise, 0 = still. */
-  ringRevMs: [0, 140000, -200000],
-  /** Gentle float of each circle. */
-  bobPx: 5,
-  bobMs: 5200,
-  /** Centre circle halo breathing period. */
-  haloMs: 3200,
-  /** Light pulses travelling round each ring's orbit line. */
+  /** The person replaced by a new arrival shrinks away in sparks. */
+  exitMs: 800,
+  /** Light pulses travelling round the decorative rings. */
   orbitPulseMs: 9000,
 } as const;
 

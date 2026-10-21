@@ -176,7 +176,7 @@ src/
     device-id.ts                         # localStorage UUID + flow state + epoch
     profanity.ts
     images/cache.ts                      # preload + decode + Map cache (screens)
-    wall/rings.ts                        # ring wall: newest-25 window + ring slots (pure)
+    wall/slots.ts                        # photo wall: newest-25 window, 5×5 grid, stable spots (pure)
     wall/queue.ts                        # spotlight queue state machine (pure)
     mask/mask.ts                         # PNG → occupancy grid
     cloud/aggregate.ts                   # responses → counts (pure)
@@ -399,12 +399,12 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 
 **Image cache** (`lib/images/cache.ts`): for every attendee, load `tileUrl` → `await img.decode()` → store. Spotlight loads `spotUrl` the same way **before** the spotlight starts. Draw `lqip` until the tile is decoded.
 
-**Ring wall** (`lib/wall/rings.ts`, pure + unit tested; config `RING_WALL` in `config/stage.ts`, timings in `WALL`):
+**Photo wall** (`lib/wall/slots.ts`, pure + unit tested; config `WALL_GRID` / `RING_PATTERN` in `config/stage.ts`):
 - Header band (top ~16% of stage): the stacked George Steuart Health logo, centred. No event title.
-- Only the **newest 25** attendees are on the wall, as large round photos on concentric rings: **1 big centre + 8 inner + 16 outer**. Slot 0 (centre) = newest. When someone new arrives everyone glides one slot outward (centre → inner → outer, rippling ring by ring); the oldest drifts off the outer ring and dissolves in sparks. With 700 attendees the wall always shows the latest 25.
-- Hidden attendees fade out; older ones move in and the next-oldest returns at the end. Empty slots (< 25 arrivals) are dim glass circles.
-- Motion: inner and outer rings turn slowly in opposite directions, circles float gently, orbit lines with travelling light pulses, a breathing halo behind the centre circle.
-- Name tags: centre circle (name + department), inner ring (first name). Centre + inner ring use the spot photo (800px) once decoded; outer ring uses the 128px tile.
+- Only the **newest 25** attendees are on the wall, as equal round photos on a fixed **5 × 5 grid**. The first 25 fill it in registration order (left → right, top → bottom). **Photos never move**: from the 26th arrival on, the newcomer takes the spot of the oldest person on the wall (who shrinks away in sparks). With 700 attendees the wall always shows the latest 25.
+- A hidden attendee fades out and the next-oldest person returns in that spot. Empty spots (< 25 arrivals) are dim glass circles.
+- Background pattern: faint concentric rings centred on the grid (outer ones run past it) with light pulses travelling round. Only the pattern moves.
+- First-name tag on every circle. Circles use the spot photo (800px) once decoded, else the 128px tile.
 - Idle ambience: every 2–3s a random circle glows/scales up slightly for ~1s; a light sweep every 20–30s; faint crown watermark (≤ 6% opacity).
 
 **Spotlight queue** (`lib/wall/queue.ts`, pure state machine + unit tests):
@@ -423,10 +423,10 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 **Spotlight visual** (`SpotlightRenderer.ts`):
 - Wall dims to ~35% and blurs slightly (pre-render a blurred wall snapshot to an offscreen canvas once per spotlight; don't blur every frame).
 - Card: photo ~55% of stage height, rounded corners, red accent ring; "Welcome" (serif) + name (heavy sans, auto-fit to width); confetti burst in brand colours on SPOT_IN.
-- FLY: card scales/translates exactly into the centre circle (FLIP, corners rounding into a circle) while the rings shift outward to make room; wall un-dims during the flight, tile lands with a small bounce. Group spotlights land in slots 0–3.
+- FLY: card scales/translates exactly into the attendee's grid spot (FLIP, corners rounding into a circle); wall un-dims during the flight, tile lands with a small bounce.
 
 **Final mode** (`mode === 'final'`, `FinalMosaic.ts`):
-- Load `crown-mask.png` → occupancy grid. Find the largest tile size where ≥ N cells fit inside the mask. Assign **all** visible attendees (not only the 25 on the rings) to in-mask cells (seeded). The 25 ring circles fly from their ring positions; everyone else grows out of their crown cell, staggered over 2.5s. Wordmark fades in below (no event title). Hold until mode returns to `live`.
+- Load `crown-mask.png` → occupancy grid. Find the largest tile size where ≥ N cells fit inside the mask. Assign **all** visible attendees (not only the 25 on the rings) to in-mask cells (seeded). The 25 on the wall fly from their spots; everyone else grows out of their crown cell, staggered over 2.5s. Wordmark fades in below (no event title). Hold until mode returns to `live`.
 
 **Performance rules**:
 - One `requestAnimationFrame` loop per screen; skip drawing when nothing changes.
@@ -602,11 +602,11 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 ### Phase 9 — Client feedback (screens)
 - [x] Remove "Achievers Night 2026" from both LED screens (wall header, wall finale, cloud).
 - [x] Screen 1 header: stacked logo (crown above "George Steuart / HEALTH"), centred.
-- [x] Screen 1 ring wall: newest 25 as circles (1 + 8 + 16), newest in the centre, shift outward on arrival, oldest leaves; rotating rings, orbit pulses, centre halo, name tags, exit sparks. `lib/wall/rings.ts` + `tests/unit/rings.test.ts` (replaces `lib/wall/grid.ts`).
-- [x] Final mode builds the crown from all attendees, not just the 25 on the rings.
+- [x] Screen 1 photo wall: newest 25 as still circles on a 5 × 5 grid; a newcomer replaces the oldest in place; decorative rings with travelling pulses behind; name tags, exit sparks. `lib/wall/slots.ts` + `tests/unit/slots.test.ts` (replaces `lib/wall/grid.ts`).
+- [x] Final mode builds the crown from all attendees, not just the 25 on the wall.
 - [x] Screen 2: crown moved up, wordmark ~80% of stage width under it.
 
-**Done when:** Screen 1 never shows more than 25 photos, a new arrival lands in the centre and pushes the oldest off; final mode still shows everyone; neither screen shows the event title.
+**Done when:** Screen 1 never shows more than 25 photos, a new arrival takes the oldest person's spot and nobody else moves; final mode still shows everyone; neither screen shows the event title.
 
 ---
 

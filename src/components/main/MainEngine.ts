@@ -1,5 +1,5 @@
-// Screen 1 engine: data → queue → one rAF loop drawing the ring wall, spotlight and final mosaic.
-// The wall shows only the newest 25 attendees (centre = newest); everyone is kept for the final crown.
+// Screen 1 engine: data → queue → one rAF loop drawing the photo wall, spotlight and final mosaic.
+// The wall shows only the newest 25 attendees on a fixed 5 × 5 grid; everyone is kept for the final crown.
 import { BRAND } from '@/config/brand';
 import { STAGE } from '@/config/stage';
 import { SPOTLIGHT, WALL } from '@/config/timings';
@@ -8,7 +8,7 @@ import { ensureFonts, fontFamilies, type FontFamilies } from '@/lib/fonts';
 import { ImageCache } from '@/lib/images/cache';
 import { containRect, loadMask } from '@/lib/mask/mask';
 import { catchUpIds, enqueue, initialQueue, removeId, tick, type QueueState } from '@/lib/wall/queue';
-import { ringCapacity, ringSlot, ringWindow, slotRing } from '@/lib/wall/rings';
+import { assignSlots, gridCapacity, gridSlot, wallWindow } from '@/lib/wall/slots';
 import { DEFAULT_CONTROL, type Attendee, type ControlState, type WallAttendee } from '@/types/models';
 import { NO_BRAND_IMAGES, drawWordmark, loadBrandImages, setupCanvas, type BrandImages } from '@/components/stage/canvas';
 import type { DebugStats } from '@/components/stage/DebugOverlay';
@@ -18,19 +18,17 @@ import {
   WALL_AREA,
   WallSprites,
   drawBackground,
-  drawCentreHalo,
   drawExitSparks,
   drawGlowTile,
   drawHeader,
   drawLandGlow,
   drawNameTag,
-  drawOrbits,
   drawRing,
+  drawRingPattern,
   drawSweep,
   drawTile,
   drawWatermark,
   leaveMs,
-  shiftProgress,
   tileFx,
   tileRect,
   type TileState,
@@ -38,9 +36,7 @@ import {
 
 const W = STAGE.width;
 const H = STAGE.height;
-const CAPACITY = ringCapacity();
-/** Centre + inner ring: big enough to use the spotlight photo, and they get name tags. */
-const BIG_SLOTS = 1 + 8;
+const CAPACITY = gridCapacity();
 /** Crown area for the final mosaic; the wordmark sits below it. */
 const FINAL_BOX: Rect = { x: W * 0.05, y: H * 0.04, w: W * 0.9, h: H * 0.76 };
 const FINAL_WORDMARK_Y = H * 0.9;
@@ -85,13 +81,13 @@ export class MainEngine {
   private controlLoaded = false;
   private shownWhilePaused = new Set<string>();
 
-  /** Who is on the rings, newest first (index = slot). */
-  private window: string[] = [];
+  /** Who is on the wall → their grid spot. Spots never change while someone is on the wall. */
+  private slots = new Map<string, number>();
   /** null until the first window is placed (an empty wall is a window too). */
   private windowKey: string | null = null;
   /** The first window after load is history: placed without animation. */
   private windowPrimed = false;
-  /** Tiles on the rings, plus ones still animating off them. */
+  /** Tiles on the wall, plus ones still animating off it. */
   private tiles = new Map<string, TileState>();
 
   private brand: BrandImages = NO_BRAND_IMAGES;
@@ -258,7 +254,7 @@ export class MainEngine {
     this.attendees.clear();
     this.order = [];
     this.tiles.clear();
-    this.window = [];
+    this.slots = new Map();
     this.windowKey = '';
     this.recent.clear();
     this.spot.reset();
@@ -269,16 +265,16 @@ export class MainEngine {
     }
   }
 
-  /** Spotlight photos: the next people up, and the big circles (centre + inner ring). */
+  /** Spotlight photos: the next people up, and everyone on the wall (the circles are bigger than a tile). */
   private preloadSpots() {
-    const ids = [...this.queue.current, ...this.queue.queue.slice(0, 8), ...this.window.slice(0, BIG_SLOTS)];
+    const ids = [...this.queue.current, ...this.queue.queue.slice(0, 8), ...this.slots.keys()];
     for (const id of ids) {
       const a = this.attendees.get(id);
       if (a) void this.cache.load(a.spotUrl, true);
     }
   }
 
-  // ── Ring wall ───────────────────────────────────────────────────────
+  // ── Photo wall ──────────────────────────────────────────────────────
 
   /** Newest 25 on the wall, including whoever is flying in from the spotlight right now. */
   private computeWindow(): string[] {
@@ -288,21 +284,20 @@ export class MainEngine {
       if (!a || a.hidden) return false;
       return this.isVisible(a) || flying.includes(id);
     });
-    return ringWindow(ids, CAPACITY);
+    return wallWindow(ids, CAPACITY);
   }
 
-  /** Window changed: newcomers pop / land in the centre, everyone else glides to their new slot. */
-  private applyWindow(next: string[], now: number) {
-    const key = next.join(',');
+  /** Window changed: newcomers take a free spot (or the oldest person's); nobody else moves. */
+  private applyWindow(window: string[], now: number) {
+    const key = window.join(',');
     if (key === this.windowKey) return;
     const instant = !this.windowPrimed;
     this.windowPrimed = true;
     this.windowKey = key;
-    this.window = next;
-    const inWindow = new Set(next);
+    this.slots = assignSlots(this.slots, window, CAPACITY);
 
     for (const [id, t] of this.tiles) {
-      if (inWindow.has(id) || t.leaveAt !== null) continue;
+      if (this.slots.has(id) || t.leaveAt !== null) continue;
       if (instant) {
         this.tiles.delete(id);
         continue;
@@ -314,37 +309,15 @@ export class MainEngine {
       if (this.ambient?.id === id) this.ambient = null;
     }
 
-    next.forEach((id, slot) => {
+    for (const [id, slot] of this.slots) {
       const t = this.tiles.get(id);
-      if (!t || t.leaveAt !== null) {
-        // New on the wall. Spotlight arrivals are drawn by the flying card until they land.
-        const flying = this.queue.current.includes(id);
-        const pop = !instant && !flying;
-        this.tiles.set(id, {
-          slot,
-          from: null,
-          shiftStart: -Infinity,
-          appearAt: now,
-          appear: pop ? 'pop' : 'none',
-          leaveAt: null,
-          leave: 'exit',
-        });
-        if (pop && this.initialised) this.markRecent(id, now);
-        return;
-      }
-      if (t.slot === slot) return;
-      if (instant) {
-        t.slot = slot;
-        t.from = null;
-        return;
-      }
-      // Glide from wherever it is now (possibly mid-glide) to the new slot; outer rings start a beat later.
-      const mix = shiftProgress(t, now);
-      const prevStart = t.from ? (mix < 0.5 ? t.from.a : t.slot) : t.slot;
-      t.from = { a: prevStart, b: t.slot, mix: t.from ? mix : 0 };
-      t.shiftStart = now + slotRing(t.slot).ring * WALL.rippleDelayMs;
-      t.slot = slot;
-    });
+      if (t && t.leaveAt === null) continue;
+      // New on the wall. Spotlight arrivals are drawn by the flying card until they land.
+      const flying = this.queue.current.includes(id);
+      const pop = !instant && !flying;
+      this.tiles.set(id, { slot, appearAt: now, appear: pop ? 'pop' : 'none', leaveAt: null, leave: 'exit' });
+      if (pop && this.initialised) this.markRecent(id, now);
+    }
     this.preloadSpots();
   }
 
@@ -447,7 +420,7 @@ export class MainEngine {
     }
     for (const [id, at] of this.recent) if (now - at >= WALL.newArrivalMs) this.recent.delete(id);
 
-    // The rings never stop turning; only a settled final crown can skip frames.
+    // The ring pattern keeps moving; only a settled final crown can skip frames.
     const settledFinal = this.final.state === 'on' && !this.final.isAnimating(now) && idle;
     if (settledFinal && !this.dirty) return;
     this.draw(now);
@@ -455,10 +428,9 @@ export class MainEngine {
     this.dirty = false;
   }
 
-  /** Best decoded image for a slot: big circles use the spotlight photo once it is in. */
-  private image(a: WallAttendee, slot: number): HTMLImageElement | null {
-    const spot = slot < BIG_SLOTS ? this.cache.get(a.spotUrl) : undefined;
-    return spot ?? this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
+  /** Best decoded image for a wall circle: the spotlight photo once it is in (circles are bigger than a tile). */
+  private image(a: WallAttendee): HTMLImageElement | null {
+    return this.cache.get(a.spotUrl) ?? this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
   }
 
   private draw(now: number) {
@@ -484,16 +456,17 @@ export class MainEngine {
         this.visibleIdsKey = key;
         this.final.update(visible, now, (id) => {
           const t = this.tiles.get(id);
-          return t ? tileRect(t, now) : null;
+          return t ? tileRect(t) : null;
         });
       }
     }
 
-    // Orbit lines + empty slots as dim glass circles (the wall looks complete from the first minute).
-    drawOrbits(ctx, this.sprites, now, wallA);
+    // Ring pattern + empty spots as dim glass circles (the wall looks complete from the first minute).
+    drawRingPattern(ctx, this.sprites, now, wallA);
     if (wallA > 0) {
-      for (let slot = this.window.length; slot < CAPACITY; slot++) {
-        drawTile(ctx, null, this.sprites, ringSlot(slot, WALL_AREA, now), 1, wallA);
+      const taken = new Set(this.slots.values());
+      for (let slot = 0; slot < CAPACITY; slot++) {
+        if (!taken.has(slot)) drawTile(ctx, null, this.sprites, gridSlot(slot, WALL_AREA), 1, wallA);
       }
     }
 
@@ -502,11 +475,11 @@ export class MainEngine {
     for (const [id, t] of this.tiles) {
       const a = this.attendees.get(id);
       if (!a || this.queue.current.includes(id)) continue;
-      const wallR = tileRect(t, now);
+      const wallR = tileRect(t);
       const rect = t.leaveAt === null ? (this.final.rect(id, wallR, now) ?? wallR) : wallR;
-      drawList.push({ id, t, rect, sprite: this.sprites.tile(this.image(a, t.slot)) });
+      drawList.push({ id, t, rect, sprite: this.sprites.tile(this.image(a)) });
     }
-    // Final mode: everyone not on the rings grows out of their crown cell.
+    // Final mode: everyone not on the wall grows out of their crown cell.
     for (const id of visible) {
       if (this.tiles.has(id)) continue;
       const cell = this.final.cell(id);
@@ -518,16 +491,10 @@ export class MainEngine {
       const img = this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null;
       drawList.push({
         id,
-        t: { slot: CAPACITY, from: null, shiftStart: -Infinity, appearAt: -Infinity, appear: 'none', leaveAt: null, leave: 'exit' },
+        t: { slot: CAPACITY, appearAt: -Infinity, appear: 'none', leaveAt: null, leave: 'exit' },
         rect,
         sprite: this.sprites.tile(img),
       });
-    }
-
-    // Newest in the centre: slow breathing halo behind it.
-    const centre = this.window[0] ? drawList.find((d) => d.id === this.window[0]) : undefined;
-    if (centre && centre.t.slot === 0 && centre.t.leaveAt === null) {
-      drawCentreHalo(ctx, this.sprites, centre.rect, now, wallA * tileFx(centre.t, now).alpha);
     }
 
     // Pass 2: red flash where a photo just landed / popped in (under the tile).
@@ -540,7 +507,7 @@ export class MainEngine {
     }
     ctx.restore();
 
-    // Pass 3: round photo tiles; the oldest leaving the wall bursts into sparks.
+    // Pass 3: round photo tiles; someone being replaced bursts into sparks.
     for (const d of drawList) {
       if (this.ambient?.id === d.id) continue;
       const fx = tileFx(d.t, now);
@@ -564,7 +531,7 @@ export class MainEngine {
 
     // Ambient glow on one random circle.
     if (!this.final.active && this.queue.phase === 'WALL_IDLE') {
-      const settled = drawList.filter((d) => d.t.leaveAt === null && d.t.slot > 0 && shiftProgress(d.t, now) >= 1);
+      const settled = drawList.filter((d) => d.t.leaveAt === null && d.t.slot < CAPACITY);
       if (!this.ambient && now >= this.nextAmbientAt && settled.length) {
         this.ambient = { id: settled[Math.floor(Math.random() * settled.length)].id, start: now };
       }
@@ -582,16 +549,13 @@ export class MainEngine {
       this.ambient = null;
     }
 
-    // Name tags on the centre (name + department) and inner ring (first name).
+    // First-name tag on every circle.
     if (wallA > 0) {
       for (const d of drawList) {
-        if (d.t.leaveAt !== null || d.t.slot >= BIG_SLOTS) continue;
+        if (d.t.leaveAt !== null || d.t.slot >= CAPACITY) continue;
         const a = this.attendees.get(d.id);
         if (!a) continue;
-        const fx = tileFx(d.t, now);
-        const settle = d.t.slot === 0 ? 1 : shiftProgress(d.t, now);
-        const label = d.t.slot === 0 ? a.name : firstName(a.name);
-        drawNameTag(ctx, this.fonts, d.rect, label, d.t.slot === 0 ? a.department : '', wallA * fx.alpha * settle);
+        drawNameTag(ctx, this.fonts, d.rect, firstName(a.name), '', wallA * tileFx(d.t, now).alpha);
       }
     }
 
@@ -620,7 +584,7 @@ export class MainEngine {
         const a = this.attendees.get(id);
         const t = this.tiles.get(id);
         const img = a ? (this.cache.get(a.spotUrl) ?? this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null) : null;
-        return { id, name: a?.name ?? '', department: a?.department ?? '', img, target: t ? tileRect(t, now) : null };
+        return { id, name: a?.name ?? '', department: a?.department ?? '', img, target: t ? tileRect(t) : null };
       });
       this.spot.draw(ctx, q.phase, progress(now, q.phaseStartedAt, dur), people);
     }
@@ -652,7 +616,7 @@ export class MainEngine {
       fps: this.fps,
       'drawn fps': this.drawFps,
       attendees: this.order.length,
-      'on wall': `${this.window.length}/${CAPACITY}`,
+      'on wall': `${this.slots.size}/${CAPACITY}`,
       queue: this.queue.queue.length,
       phase: this.queue.phase,
       images: this.cache.size,
