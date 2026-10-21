@@ -41,9 +41,9 @@ import type { DebugStats } from '@/components/stage/DebugOverlay';
 
 const W = STAGE.width;
 const H = STAGE.height;
-const CROWN_BOX: Rect = { x: W * 0.02, y: H * 0.035, w: W * 0.96, h: H * 0.68 };
+const CROWN_BOX: Rect = { x: W * 0.02, y: H * 0.025, w: W * 0.96, h: H * 0.76 };
 /** "George Steuart / HEALTH" under the crown cloud, built from tiny letters. */
-const WORDMARK_Y = H * 0.865;
+const WORDMARK_Y = H * 0.89;
 const WORDMARK_W = W * WORDMARK_MOSAIC.widthRatio;
 /** Size of the letters the wordmark is made of. */
 const GLYPH_SIZE = WORDMARK_MOSAIC.cell * WORDMARK_MOSAIC.fontScale;
