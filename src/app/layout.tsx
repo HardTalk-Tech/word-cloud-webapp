@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
+import { EVENT } from "@/config/brand";
 import "./globals.css";
 
 const display = Montserrat({
@@ -15,8 +16,8 @@ const serif = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "George Steuart — Event Wall",
-  description: "Join the wall: selfie wall and live word cloud.",
+  title: EVENT.fullName,
+  description: `${EVENT.fullName}: join the wall with your selfie and share your answers on the big screen.`,
 };
 
 export const viewport: Viewport = {

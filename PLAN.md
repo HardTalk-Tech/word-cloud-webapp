@@ -113,6 +113,10 @@ Vercel: serves the Next.js pages only.
     - `crown-mask.png` — **solid silhouette** of the crown (dotted outline joined, holes filled), white on transparent. Used as the shape mask for the word cloud and final photo mosaic; same crop box as `crown.png` so the faint crown drawn behind them lines up.
   - An SVG or higher-resolution PNG of the logo would make the large faint crowns sharper; re-run `npm run brand` after replacing `GS-Logo.png`.
 - All brand values in `src/config/brand.ts`.
+- **Event:** *George Steuart Health Achievers Night 2026* (`EVENT` in `src/config/brand.ts`). The wordmark is the
+  George Steuart **Health** lock-up (`GS-Health-Logo.png`: grey name + teal `#11B9A8` "HEALTH"), shown with the crown
+  on the phone, dashboard and both screens; the event title appears on the phone landing page, the Screen 1 header
+  and finale, the top of Screen 2, the login page, page titles and export file names.
 - **LED background** (both screens): animated dark-red glow, soft stage-light beams and glowing bokeh dots, drawn on its own
   canvas behind the screen canvas (`components/stage/BackgroundRenderer.ts`, settings in `src/config/background.ts`).
   Pre-rendered sprites, ~30 fps, never forces the wall/cloud to redraw. The cloud variant is calmer and darkens the area

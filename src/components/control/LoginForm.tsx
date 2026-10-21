@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BRAND } from '@/config/brand';
+import { BRAND, EVENT } from '@/config/brand';
 import { DEFAULT_EVENT } from '@/config/events';
 import { operatorSignIn } from '@/lib/firebase/auth';
 
@@ -36,8 +36,9 @@ export function LoginForm() {
       <form onSubmit={submit} className="w-full max-w-sm rounded-3xl bg-surface p-8 ring-1 ring-line">
         <div className="flex flex-col items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={BRAND.logo} alt={BRAND.name} className="h-20 w-auto" />
-          <h1 className="mt-4 text-xl font-extrabold">Operator sign in</h1>
+          <img src={BRAND.logo} alt={BRAND.name} className="h-28 w-auto" />
+          <p className="text-gold mt-3 text-sm font-bold tracking-[0.14em] uppercase">{EVENT.title}</p>
+          <h1 className="mt-2 text-xl font-extrabold">Operator sign in</h1>
         </div>
         <label className="mt-8 block text-sm font-semibold text-brand-grey-light">
           Username

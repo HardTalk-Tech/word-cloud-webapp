@@ -1,7 +1,8 @@
-// Builds the brand images used by the app from the client's logo (public/brand/GS-Logo.png):
+// Builds the brand images used by the app from the client's logos (public/brand/GS-Logo.png for the
+// crown, public/brand/GS-Health-Logo.png for the "George Steuart / HEALTH" wordmark):
 //   crown.png       red crown only, transparent (headers, faint crown behind cloud + mosaic)
-//   wordmark.png    "George Steuart" only, lightened for dark backgrounds
-//   logo-dark.png   crown + lightened wordmark (phone, dashboard)
+//   wordmark.png    "George Steuart / HEALTH", grey lightened for dark backgrounds, teal kept
+//   logo-dark.png   crown above the wordmark (phone, dashboard)
 //   crown-mask.png  solid white crown silhouette (dots joined, holes filled) — the shape the
 //                   word cloud and the final photo mosaic fill. Same crop box as crown.png.
 // and the app icons in src/app (Next.js file conventions):
@@ -17,7 +18,13 @@ const DIR = path.join(process.cwd(), 'public', 'brand');
 const APP_DIR = path.join(process.cwd(), 'src', 'app');
 const ICON_BG = { r: 0x0b, g: 0x0b, b: 0x0d, alpha: 1 };
 const SOURCE = path.join(DIR, 'GS-Logo.png');
-/** Wordmark colour on dark screens (logo grey #64666A is too dark on near-black). */
+/** "George Steuart / HEALTH" wordmark (grey + teal on white). */
+const WORDMARK_SOURCE = path.join(DIR, 'GS-Health-Logo.png');
+const HEALTH_GREY = 0x80;
+const HEALTH_TEAL = [0x11, 0xb9, 0xa8] as const;
+/** Crown width relative to the wordmark width in the stacked logo. */
+const CROWN_TO_WORDMARK = 0.42;
+/** Wordmark grey on dark screens (the logo greys are too dark on near-black). */
 const WORDMARK_ON_DARK = [0xb3, 0xb5, 0xb8] as const;
 /** Silhouette is built at this multiple of the logo resolution for smooth edges. */
 const MASK_SCALE = 4;
@@ -28,8 +35,6 @@ type Raw = { data: Buffer; width: number; height: number };
 // Near-transparent edge pixels carry arbitrary colours; ignore them when classifying.
 const MIN_ALPHA = 24;
 const isRed = (r: number, g: number, a: number) => a >= MIN_ALPHA && r - g > 50;
-const isGrey = (r: number, g: number, b: number, a: number) =>
-  a >= MIN_ALPHA && Math.abs(r - g) < 25 && Math.abs(g - b) < 25 && r < 210;
 
 function bbox(src: Raw, test: (i: number) => boolean) {
   let x0 = src.width;
@@ -189,29 +194,67 @@ async function writeIcons(crownPng: string, maskPng: string) {
   await writeFile(path.join(APP_DIR, 'apple-icon.png'), await squareIcon(crown, 180, 0.72, ICON_BG));
 }
 
+/**
+ * The Health wordmark comes on white: rebuild real transparency from each pixel's distance to white
+ * (the letters are a flat grey / teal, so alpha = how far the pixel moved from white towards that colour),
+ * then recolour the grey for dark screens and keep the brand teal.
+ */
+async function healthWordmark(): Promise<Buffer> {
+  const { data, info } = await sharp(WORDMARK_SOURCE).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  // "HEALTH" is the teal band under the grey name: find where it starts.
+  let tealTop = height;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 1] - data[i] > 80) tealTop = Math.min(tealTop, Math.floor(i / 4 / width));
+  }
+  const out = Buffer.alloc(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
+    if (a < MIN_ALPHA) continue;
+    const teal = Math.floor(i / 4 / width) >= tealTop - 6;
+    const coverage = teal ? (255 - r) / (255 - HEALTH_TEAL[0]) : (255 - (r + g + b) / 3) / (255 - HEALTH_GREY);
+    const alpha = Math.min(1, Math.max(0, coverage)) * (a / 255);
+    if (alpha < 0.04) continue;
+    const rgb = teal ? HEALTH_TEAL : WORDMARK_ON_DARK;
+    out[i] = rgb[0];
+    out[i + 1] = rgb[1];
+    out[i + 2] = rgb[2];
+    out[i + 3] = Math.round(alpha * 255);
+  }
+  const trimmed = await png(out, width, height).trim({ threshold: 0 }).png().toBuffer();
+  return sharp(trimmed)
+    .extend({ top: PAD, bottom: PAD, left: PAD, right: PAD, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+}
+
 async function main() {
   const { data, info } = await sharp(SOURCE).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const src: Raw = { data, width: info.width, height: info.height };
   const red = (i: number) => isRed(data[i], data[i + 1], data[i + 3]);
-  const grey = (i: number) => isGrey(data[i], data[i + 1], data[i + 2], data[i + 3]) && !red(i);
 
   const crownBox = bbox(src, red);
-  const wordBox = bbox(src, grey);
-  const all = bbox(src, (i) => red(i) || grey(i));
 
   // crown.png
   await png(isolate(src, red), src.width, src.height).extract(crownBox).png().toFile(path.join(DIR, 'crown.png'));
-  // wordmark.png
-  await png(isolate(src, grey, WORDMARK_ON_DARK), src.width, src.height)
-    .extract(wordBox)
+  // wordmark.png: "George Steuart / HEALTH" from the Health logo, for dark backgrounds.
+  const wordmark = await healthWordmark();
+  await writeFile(path.join(DIR, 'wordmark.png'), wordmark);
+  // logo-dark.png: crown centred above the wordmark (proportions of the original lock-up).
+  const wm = await sharp(wordmark).metadata();
+  const crownW = Math.round(wm.width! * CROWN_TO_WORDMARK);
+  const crownImg = await sharp(path.join(DIR, 'crown.png')).resize({ width: crownW, kernel: 'lanczos3' }).png().toBuffer();
+  const crownH = (await sharp(crownImg).metadata()).height!;
+  const gap = Math.round(wm.width! * 0.03);
+  await sharp({
+    create: { width: wm.width!, height: crownH + gap + wm.height!, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([
+      { input: crownImg, left: Math.round((wm.width! - crownW) / 2), top: 0 },
+      { input: wordmark, left: 0, top: crownH + gap },
+    ])
     .png()
-    .toFile(path.join(DIR, 'wordmark.png'));
-  // logo-dark.png
-  const dark = Buffer.alloc(data.length);
-  isolate(src, red).copy(dark);
-  const greyOnly = isolate(src, grey, WORDMARK_ON_DARK);
-  for (let i = 0; i < dark.length; i += 4) if (greyOnly[i + 3]) greyOnly.copy(dark, i, i, i + 4);
-  await png(dark, src.width, src.height).extract(all).png().toFile(path.join(DIR, 'logo-dark.png'));
+    .toFile(path.join(DIR, 'logo-dark.png'));
 
   // crown-mask.png: upscale crown alpha → join the dotted outline (dilate) → fill holes → erode back.
   const w = crownBox.width * MASK_SCALE;
@@ -237,7 +280,7 @@ async function main() {
   await writeIcons(path.join(DIR, 'crown.png'), path.join(DIR, 'crown-mask.png'));
 
   console.log('crown     ', crownBox);
-  console.log('wordmark  ', wordBox);
+  console.log('wordmark  ', `${wm.width}x${wm.height}`);
   console.log('mask      ', `${w}x${h}`);
   console.log(`Wrote crown.png, wordmark.png, logo-dark.png, crown-mask.png to ${DIR}`);
   console.log(`Wrote favicon.ico, icon.png, apple-icon.png to ${APP_DIR}`);

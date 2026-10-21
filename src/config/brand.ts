@@ -1,7 +1,21 @@
+/** The event. Shown on the phone landing page, both LED screens, the dashboard and page titles. */
+export const EVENT = {
+  /** Short title for headlines and the screens. */
+  title: 'Achievers Night 2026',
+  /** Full name for page titles and exports. */
+  fullName: 'George Steuart Health Achievers Night 2026',
+} as const;
+
 export const BRAND = {
-  name: 'George Steuart',
-  // Sampled from public/brand/GS-Logo.png (crown red / wordmark grey).
+  name: 'George Steuart Health',
+  // Sampled from public/brand/GS-Logo.png (crown red / wordmark grey) and GS-Health-Logo.png (teal).
   red: '#AC1F2D',
+  /** "HEALTH" teal from the George Steuart Health wordmark. */
+  teal: '#11B9A8',
+  /** Event title ("Achievers Night 2026"): metallic gold, light → main → deep. */
+  goldLight: '#F6DC8D',
+  gold: '#D4AF37',
+  goldDark: '#A9822A',
   redLight: '#C8303F',
   redDark: '#6E1420',
   grey: '#8A8A8D',
@@ -11,10 +25,10 @@ export const BRAND = {
   background: '#0B0B0D',
   surface: '#16161A',
   surfaceRaised: '#202026',
-  // Generated from GS-Logo.png by `npm run brand` (scripts/make-brand-assets.ts).
+  // Generated from GS-Logo.png + GS-Health-Logo.png by `npm run brand` (scripts/make-brand-assets.ts).
   /** Red crown only, transparent. */
   crown: '/brand/crown.png',
-  /** "George Steuart" only, lightened for dark backgrounds. */
+  /** "George Steuart / HEALTH" (two lines), grey lightened for dark backgrounds. */
   wordmark: '/brand/wordmark.png',
   /** Crown + wordmark stacked, for dark backgrounds. */
   logo: '/brand/logo-dark.png',
@@ -45,7 +59,7 @@ export const FONT_VARS = {
 export const FONT_FALLBACK = '"Nirmala UI", "Noto Sans Sinhala", "Noto Sans Tamil", "Iskoola Pota", system-ui, sans-serif';
 
 export const COPY = {
-  landingHeadline: 'Join the wall',
+  landingEyebrow: 'Welcome to',
   landingSub: 'Snap a selfie and see yourself on the big screen.',
   joinButton: 'Join Event',
   continueButton: 'Continue',

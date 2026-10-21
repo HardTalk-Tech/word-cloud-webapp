@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User } from 'firebase/auth';
-import { BRAND } from '@/config/brand';
+import { BRAND, EVENT } from '@/config/brand';
 import { EVENT_IDS } from '@/config/events';
 import { operatorSignOut } from '@/lib/firebase/auth';
 import { emailToUsername } from '@/lib/auth/username';
@@ -30,7 +30,8 @@ export function Dashboard({ eventId, user }: { eventId: string; user: User }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={BRAND.crown} alt="" className="h-8 w-auto" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={BRAND.wordmark} alt={BRAND.name} className="h-5 w-auto" />
+          <img src={BRAND.wordmark} alt={BRAND.name} className="h-9 w-auto" />
+          <span className="text-gold hidden text-sm font-bold tracking-[0.14em] uppercase md:inline">{EVENT.title}</span>
           <span className="rounded-full bg-surface-raised px-3 py-1 text-xs font-semibold text-brand-grey-light">
             Operator
           </span>

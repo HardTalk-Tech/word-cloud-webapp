@@ -10,4 +10,4 @@ export function isEventId(value: string): value is EventId {
 }
 
 /** File-name prefix for exports. */
-export const EXPORT_PREFIX = 'george-steuart';
+export const EXPORT_PREFIX = 'gs-health-achievers-night-2026';

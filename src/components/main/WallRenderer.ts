@@ -5,7 +5,14 @@ import { MAX_DPR, STAGE, WALL_HEADER_RATIO, WALL_PADDING } from '@/config/stage'
 import { WALL } from '@/config/timings';
 import { clamp, easeInOutCubic, easeOutBack, lerpRect, progress, type Rect } from '@/lib/anim';
 import type { FontFamilies } from '@/lib/fonts';
-import { clearStage, drawWordmark, glowSprite, roundRectPath, type BrandImages } from '@/components/stage/canvas';
+import {
+  clearStage,
+  drawEventTitle,
+  drawWordmark,
+  glowSprite,
+  roundRectPath,
+  type BrandImages,
+} from '@/components/stage/canvas';
 
 export const HEADER_H = Math.round(STAGE.height * WALL_HEADER_RATIO);
 
@@ -192,18 +199,20 @@ export function drawWatermark(ctx: CanvasRenderingContext2D, watermark: CanvasIm
   ctx.restore();
 }
 
-/** Header band: crown + wordmark. */
+/** Header band: crown + "George Steuart / HEALTH" on the left, event title on the right. */
 export function drawHeader(ctx: CanvasRenderingContext2D, fonts: FontFamilies, brand: BrandImages, alpha = 1) {
   if (alpha <= 0) return;
+  const cy = HEADER_H / 2 + 6;
   drawWordmark(ctx, {
     x: WALL_PADDING,
-    y: HEADER_H / 2 + 6,
+    y: cy,
     height: Math.round(HEADER_H * 0.72),
     align: 'left',
     fonts,
     brand,
     alpha,
   });
+  drawEventTitle(ctx, { x: STAGE.width - WALL_PADDING, y: cy, size: Math.round(HEADER_H * 0.3), align: 'right', fonts, alpha });
 }
 
 export function drawGlassLayer(ctx: CanvasRenderingContext2D, layer: HTMLCanvasElement | null, alpha: number) {

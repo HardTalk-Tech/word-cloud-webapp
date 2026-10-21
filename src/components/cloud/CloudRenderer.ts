@@ -25,6 +25,7 @@ import { hashString } from '@/lib/random';
 import { DEFAULT_CONTROL, type ControlState, type ResponseDoc } from '@/types/models';
 import {
   clearStage,
+  drawEventTitle,
   drawWordmark,
   ellipsize,
   fitFontSize,
@@ -394,12 +395,14 @@ export class CloudRenderer {
     this.drawWords(now);
     this.drawFlyers(now);
 
-    this.drawBanner(now);
+    // Event title at the top; the spotlight-question banner takes its place when shown.
+    const banner = this.drawBanner(now);
+    drawEventTitle(ctx, { x: W / 2, y: H * 0.06, size: 30, align: 'center', fonts: this.fonts, alpha: 1 - banner });
     drawWordmark(ctx, {
       x: W / 2,
       y: WORDMARK_Y - fin * 6,
       // Wordmark only: the cloud above it is the crown.
-      height: 52 + 16 * fin,
+      height: 64 + 14 * fin,
       align: 'center',
       fonts: this.fonts,
       brand: this.brand,
@@ -530,11 +533,12 @@ export class CloudRenderer {
     }
   }
 
-  private drawBanner(now: number) {
+  /** Spotlight-question banner at the top. Returns how visible it is (0..1). */
+  private drawBanner(now: number): number {
     const p = easeInOutCubic(progress(now, this.focusAt, CLOUD.focusTweenMs));
     const show = (q: string | null) => (q ? 1 : 0);
     const barAlpha = lerp(show(this.focusFrom), show(this.focusTo), p);
-    if (barAlpha <= 0) return;
+    if (barAlpha <= 0) return 0;
     const ctx = this.ctx;
     const maxW = W * 0.86;
     const font = (s: number) => `700 ${s}px ${this.fonts.display}`;
@@ -557,6 +561,7 @@ export class CloudRenderer {
       ctx.fillText(ellipsize(ctx, question.text, maxW), W / 2, H * 0.075);
     }
     ctx.restore();
+    return barAlpha;
   }
 
   stats(): DebugStats {

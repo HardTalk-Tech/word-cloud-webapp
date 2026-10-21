@@ -72,7 +72,7 @@ describe('csv', () => {
 describe('names', () => {
   it('formats Colombo time and file names', () => {
     expect(formatColombo(null)).toBe('');
-    expect(exportFileName('main', 'xlsx', T)).toBe('george-steuart-main-2026-10-20-1800.xlsx');
+    expect(exportFileName('main', 'xlsx', T)).toBe('gs-health-achievers-night-2026-main-2026-10-20-1800.xlsx');
     expect(photoFileName(7, 'A/B: "C"  D')).toBe('007_AB_C_D.jpg');
   });
 });

@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { COPY } from '@/config/brand';
+import { COPY, EVENT } from '@/config/brand';
 import { BrandMark, StepShell, Title } from './ui';
 
 export function Thanks() {
@@ -14,6 +14,9 @@ export function Thanks() {
           <BrandMark size="lg" />
         </motion.div>
         <Title sub={COPY.thanksSub}>{COPY.thanksTitle}</Title>
+        <p className="font-serif text-xl tracking-[0.12em] text-brand-grey-light">
+          Enjoy <span className="text-gold font-bold">{EVENT.title}</span>
+        </p>
       </div>
     </StepShell>
   );

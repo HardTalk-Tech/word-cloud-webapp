@@ -1,10 +1,11 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { EVENT } from '@/config/brand';
 import { EVENT_IDS, isEventId } from '@/config/events';
 import { PhoneFlow } from '@/components/phone/PhoneFlow';
 
-export const metadata: Metadata = { title: 'Join the wall — George Steuart' };
+export const metadata: Metadata = { title: EVENT.fullName };
 
 type Params = PageProps<'/e/[eventId]'>['params'];
 

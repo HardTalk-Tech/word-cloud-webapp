@@ -4,6 +4,8 @@
 @theme {
   --color-brand: #ac1f2d;
   --color-brand-dark: #6e1420;
+  --color-brand-teal: #11b9a8;
+  --color-brand-gold: #d4af37;
   --color-brand-grey: #8a8a8d;
   --color-brand-grey-light: #c9c9cc;
   --color-ink: #0b0b0d;
@@ -32,6 +34,15 @@ body {
 /* Phone: no rubber-band overscroll behind the flow. */
 .phone-root {
   overscroll-behavior: none;
+}
+
+/* Event title: metallic gold (keep colours in sync with BRAND.gold* in src/config/brand.ts). */
+.text-gold {
+  color: #d4af37;
+  background: linear-gradient(180deg, #f6dc8d 0%, #d4af37 55%, #a9822a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Thin, dark scrollbars on the dashboard. */

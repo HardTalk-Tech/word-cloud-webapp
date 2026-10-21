@@ -1,6 +1,6 @@
 import { MAX_DPR } from '@/config/stage';
 import { BACKGROUND } from '@/config/background';
-import { BRAND } from '@/config/brand';
+import { BRAND, EVENT } from '@/config/brand';
 import type { FontFamilies } from '@/lib/fonts';
 
 /**
@@ -24,6 +24,36 @@ export function setupCanvas(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   return ctx;
+}
+
+/**
+ * Event title for the LED screens, e.g. "ACHIEVERS NIGHT 2026": letter-spaced capitals in metallic
+ * gold (vertical light → deep gold gradient). (x, y) = anchor at the vertical centre. Returns the drawn width.
+ */
+export function drawEventTitle(
+  ctx: CanvasRenderingContext2D,
+  opts: { x: number; y: number; size: number; align: 'left' | 'center' | 'right'; fonts: FontFamilies; alpha?: number },
+): number {
+  const { x, y, size, align, fonts, alpha = 1 } = opts;
+  if (alpha <= 0) return 0;
+  const text = EVENT.title.toUpperCase();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = `700 ${size}px ${fonts.display}`;
+  ctx.letterSpacing = `${Math.round(size * 0.16)}px`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const total = ctx.measureText(text).width;
+  const left = align === 'left' ? x : align === 'center' ? x - total / 2 : x - total;
+  const gold = ctx.createLinearGradient(0, y - size * 0.45, 0, y + size * 0.45);
+  gold.addColorStop(0, BRAND.goldLight);
+  gold.addColorStop(0.55, BRAND.gold);
+  gold.addColorStop(1, BRAND.goldDark);
+  ctx.fillStyle = gold;
+  ctx.fillText(text, left, y);
+  ctx.letterSpacing = '0px';
+  ctx.restore();
+  return total;
 }
 
 /** Soft round light sprite (bright core → transparent), drawn with 'lighter' for glows and sparks. */
@@ -111,7 +141,7 @@ export function drawAtHeight(ctx: CanvasRenderingContext2D, img: HTMLImageElemen
 }
 
 /**
- * Logo lock-up: [crown] + "George Steuart" wordmark, in one row.
+ * Logo lock-up: [crown] + "George Steuart / HEALTH" wordmark, in one row.
  * `height` is the crown height (or the wordmark height when `crown` is false).
  * (x, y) is the anchor: left/centre/right edge, vertical centre.
  */
@@ -131,8 +161,9 @@ export function drawWordmark(
   const { x, y, height, align, fonts, brand, crown = true, alpha = 1 } = opts;
   if (alpha <= 0) return;
   const crownImg = crown ? brand.crown : null;
-  const wordH = crownImg ? height * 0.5 : height;
-  const gap = crownImg ? height * 0.25 : 0;
+  // Two-line "George Steuart / HEALTH" wordmark: ~70% of the crown height next to it.
+  const wordH = crownImg ? height * 0.7 : height;
+  const gap = crownImg ? height * 0.22 : 0;
   const crownW = crownImg ? (crownImg.naturalWidth / crownImg.naturalHeight) * height : 0;
 
   ctx.save();

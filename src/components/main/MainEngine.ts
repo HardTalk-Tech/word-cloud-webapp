@@ -9,7 +9,13 @@ import { containRect, loadMask } from '@/lib/mask/mask';
 import { chooseTier, computeWall, type WallLayout } from '@/lib/wall/grid';
 import { catchUpIds, enqueue, initialQueue, removeId, tick, type QueueState } from '@/lib/wall/queue';
 import { DEFAULT_CONTROL, type Attendee, type ControlState, type WallAttendee } from '@/types/models';
-import { drawWordmark, loadBrandImages, setupCanvas, type BrandImages } from '@/components/stage/canvas';
+import {
+  drawEventTitle,
+  drawWordmark,
+  loadBrandImages,
+  setupCanvas,
+  type BrandImages,
+} from '@/components/stage/canvas';
 import type { DebugStats } from '@/components/stage/DebugOverlay';
 import { FinalMosaic } from './FinalMosaic';
 import { SpotlightRenderer, type SpotPerson } from './SpotlightRenderer';
@@ -36,7 +42,8 @@ const H = STAGE.height;
 const MOVE_MS = 700;
 /** Crown area for the final mosaic; the wordmark sits below it. */
 const FINAL_BOX: Rect = { x: W * 0.05, y: H * 0.04, w: W * 0.9, h: H * 0.76 };
-const FINAL_WORDMARK_Y = H * 0.885;
+const FINAL_WORDMARK_Y = H * 0.87;
+const FINAL_TITLE_Y = H * 0.95;
 /** When only the slow new-arrival rings are fading, redraw at this interval instead of every frame. */
 const SLOW_REDRAW_MS = 100;
 
@@ -533,13 +540,14 @@ export class MainEngine {
         x: W / 2,
         y: FINAL_WORDMARK_Y,
         // Wordmark only: the photo mosaic is the crown.
-        height: 64 + 8 * fin,
+        height: 70 + 8 * fin,
         align: 'center',
         fonts: this.fonts,
         brand: this.brand,
         crown: false,
         alpha: fin,
       });
+      drawEventTitle(ctx, { x: W / 2, y: FINAL_TITLE_Y, size: 28, align: 'center', fonts: this.fonts, alpha: fin });
     }
 
     if (this.queue.phase !== 'WALL_IDLE') {

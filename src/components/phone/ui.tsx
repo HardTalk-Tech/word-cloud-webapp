@@ -2,9 +2,9 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { BRAND } from '@/config/brand';
 
-/** George Steuart logo (crown + wordmark, dark-background version). */
+/** George Steuart Health logo (crown + two-line wordmark, dark-background version). */
 export function BrandMark({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const h = size === 'lg' ? 'h-36' : size === 'md' ? 'h-24' : 'h-16';
+  const h = size === 'lg' ? 'h-40' : size === 'md' ? 'h-28' : 'h-20';
   return (
     <div className="flex justify-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
