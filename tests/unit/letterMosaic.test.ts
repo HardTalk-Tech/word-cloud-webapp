@@ -55,6 +55,25 @@ describe('buildLetterMosaic', () => {
   });
 });
 
+describe('keep / coverage', () => {
+  it('keep < 1 leaves some inked cells empty, the same ones for a seed', () => {
+    const { rgba, w, h } = image();
+    const all = buildLetterMosaic(rgba, w, h, { x: 0, y: 0 }, opts);
+    const some = buildLetterMosaic(rgba, w, h, { x: 0, y: 0 }, { ...opts, keep: 0.5 });
+    expect(some.length).toBeGreaterThan(0);
+    expect(some.length).toBeLessThan(all.length);
+    expect(buildLetterMosaic(rgba, w, h, { x: 0, y: 0 }, { ...opts, keep: 0.5 })).toEqual(some);
+  });
+
+  it('a stroke thinner than the coverage needs gets no letter', () => {
+    // 1px-wide vertical line in a 10×10 image: 10% of a 10px cell.
+    const rgba = new Uint8ClampedArray(10 * 10 * 4);
+    for (let y = 0; y < 10; y++) rgba.set([200, 200, 200, 255], (y * 10 + 5) * 4);
+    expect(buildLetterMosaic(rgba, 10, 10, { x: 0, y: 0 }, { cell: 10, seed: 's', coverage: 0.6 })).toHaveLength(0);
+    expect(buildLetterMosaic(rgba, 10, 10, { x: 0, y: 0 }, { cell: 10, seed: 's', coverage: 0.05 })).toHaveLength(1);
+  });
+});
+
 describe('pickSource', () => {
   const glyphs: Glyph[] = ['A', 'B', 'C', 'B'].map((char, i) => ({ x: i, y: 0, char, tone: 'name', phase: 0 }));
 

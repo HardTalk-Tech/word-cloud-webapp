@@ -437,7 +437,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 
 **Data**: `onSnapshot` on `responses` + `control/state`. Aggregate with `lib/cloud/aggregate.ts` → `Map<optionId, count>` (also per question).
 
-**Visual concept**: dark background; crown silhouette filled with answer words (crown moved up into the space the removed event title used); the "George Steuart / HEALTH" wordmark below the crown at ~60% of stage width, **built from tiny random letters** (`lib/cloud/letterMosaic.ts`: one seeded A–Z letter per inked cell of `wordmark.png`, grey name / teal HEALTH; pre-rendered once, a few letters twinkle). No event title. Optional question banner at the top when `spotlightQuestion` is set.
+**Visual concept**: dark background; crown silhouette filled with answer words (crown moved up into the space the removed event title used); the "George Steuart / HEALTH" wordmark below the crown at ~60% of stage width: the **real wordmark drawn faint** (35%) as a frame, with a light sprinkle of small random letters living inside its thick strokes (`lib/cloud/letterMosaic.ts`: seeded A–Z, ~60% of eligible cells; warm white in the name, mint in HEALTH; clipped to the wordmark shape so none spill onto the black; pre-rendered once, a few letters twinkle). Settings in `WORDMARK_MOSAIC`. No event title. Optional question banner at the top when `spotlightQuestion` is set.
 
 **Mask** (`lib/mask/mask.ts`): draw `crown-mask.png` at stage size → alpha threshold → occupancy grid with cell size 3px; cells outside crown pre-marked occupied.
 
@@ -606,7 +606,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 - [x] Screen 1 photo wall: newest 25 as still circles on a 5 × 5 grid; a newcomer replaces the oldest in place; decorative rings with travelling pulses behind; name + department badges, exit sparks. `lib/wall/slots.ts` + `tests/unit/slots.test.ts` (replaces `lib/wall/grid.ts`).
 - [x] Final mode builds the crown from all attendees, not just the 25 on the wall.
 - [x] Screen 2: crown moved up, wordmark under it.
-- [x] Screen 2 wordmark ~60% width, built from tiny random letters (`letterMosaic.ts` + tests).
+- [x] Screen 2 wordmark ~60% width: real wordmark as a faint frame + sparse random letters clipped inside its strokes (`letterMosaic.ts` + tests).
 - [x] Screen 2 new answers: letters pop out of the wordmark and fly into the word with soft star sparks (`letterFlight.ts` + tests).
 
 **Done when:** Screen 1 never shows more than 25 photos, a new arrival takes the oldest person's spot and nobody else moves; final mode still shows everyone; neither screen shows the event title.

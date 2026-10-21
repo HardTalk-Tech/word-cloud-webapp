@@ -49,16 +49,26 @@ export const CLOUD_PALETTE = {
   outline: '#FF4D5E',
 } as const;
 
-/** Screen 2 wordmark: "George Steuart / HEALTH" built from tiny random letters. */
+/**
+ * Screen 2 wordmark: the real "George Steuart / HEALTH" drawn faint as a frame, with a sprinkle of small
+ * random letters living inside its strokes (clipped to them).
+ */
 export const WORDMARK_MOSAIC = {
   /** Wordmark width, × stage width. */
   widthRatio: 0.6,
-  /** One letter per `cell` stage px of the wordmark's strokes. */
-  cell: 6,
+  /** Opacity of the real wordmark underneath. */
+  frameOpacity: 0.35,
+  /** At most one letter per `cell` stage px, only where a stroke covers ≥ `coverage` of the cell. */
+  cell: 11,
+  coverage: 0.6,
+  /** Share of eligible cells that get a letter (the rest stay empty, so it reads as a light sprinkle). */
+  keep: 0.6,
   /** Letter size, × cell. */
-  fontScale: 1.45,
-  name: '#B3B5B8',
-  health: '#11B9A8',
+  fontScale: 0.75,
+  /** Letter colours: brighter tints of the stroke underneath. */
+  name: '#F2EEEA',
+  health: '#A8F2E8',
+  letterOpacity: 0.88,
   /** Twinkling letters drawn brighter on top. */
   twinkle: '#FFFFFF',
   seed: 'gsh-wordmark',

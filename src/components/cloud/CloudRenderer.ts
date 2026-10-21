@@ -89,6 +89,8 @@ function makeStarSprite(color: string, size = 48): HTMLCanvasElement {
   return c;
 }
 
+const glyphColor = (g: Glyph) => (g.tone === 'health' ? WORDMARK_MOSAIC.health : WORDMARK_MOSAIC.name);
+
 /** Small stable integer hash, for picking twinkling glyphs. */
 function mix(n: number): number {
   let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
@@ -218,8 +220,9 @@ export class CloudRenderer {
   }
 
   /**
-   * Draw wordmark.png into its rect, read the pixels back and pack tiny random letters into its strokes
-   * (grey name, teal HEALTH). All glyphs are rendered once into a sprite; a frame draws it with one drawImage.
+   * Draw wordmark.png into its rect, read the pixels back and sprinkle small random letters into its thick
+   * strokes. The sprite = the real wordmark, faint, with the letters on top clipped to its shape (so none
+   * spill onto the black). Rendered once; a frame draws it with one drawImage.
    */
   private buildMosaic() {
     const img = this.brand.wordmark;
@@ -238,8 +241,14 @@ export class CloudRenderer {
     const sctx = src.getContext('2d', { willReadFrequently: true });
     if (!sctx) return;
     sctx.drawImage(img, 0, 0, w, h);
-    const { cell, seed } = WORDMARK_MOSAIC;
-    this.glyphs = buildLetterMosaic(sctx.getImageData(0, 0, w, h).data, w, h, { x: rect.x, y: rect.y }, { cell, seed });
+    const { cell, seed, coverage, keep } = WORDMARK_MOSAIC;
+    this.glyphs = buildLetterMosaic(sctx.getImageData(0, 0, w, h).data, w, h, { x: rect.x, y: rect.y }, {
+      cell,
+      seed,
+      coverage,
+      keep,
+      jitter: 0.06,
+    });
 
     const pad = Math.ceil(GLYPH_SIZE);
     const out: Rect = { x: rect.x - pad, y: rect.y - pad, w: w + pad * 2, h: h + pad * 2 };
@@ -249,13 +258,27 @@ export class CloudRenderer {
     sprite.height = Math.round(out.h * dpr);
     const ctx = sprite.getContext('2d')!;
     ctx.scale(dpr, dpr);
-    ctx.font = `800 ${GLYPH_SIZE.toFixed(1)}px ${this.fonts.display}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    // Frame: the real wordmark, faint.
+    ctx.globalAlpha = WORDMARK_MOSAIC.frameOpacity;
+    ctx.drawImage(img, pad, pad, w, h);
+    // Letters on their own layer, cut to the wordmark's shape, then laid over the frame.
+    const letters = document.createElement('canvas');
+    letters.width = sprite.width;
+    letters.height = sprite.height;
+    const lctx = letters.getContext('2d')!;
+    lctx.scale(dpr, dpr);
+    lctx.font = `800 ${GLYPH_SIZE.toFixed(1)}px ${this.fonts.display}`;
+    lctx.textAlign = 'center';
+    lctx.textBaseline = 'middle';
     for (const g of this.glyphs) {
-      ctx.fillStyle = g.tone === 'health' ? WORDMARK_MOSAIC.health : WORDMARK_MOSAIC.name;
-      ctx.fillText(g.char, g.x - out.x, g.y - out.y);
+      lctx.fillStyle = glyphColor(g);
+      lctx.fillText(g.char, g.x - out.x, g.y - out.y);
     }
+    lctx.globalCompositeOperation = 'destination-in';
+    lctx.drawImage(img, pad, pad, w, h);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = WORDMARK_MOSAIC.letterOpacity;
+    ctx.drawImage(letters, 0, 0);
     this.mosaic = { sprite, rect: out };
   }
 
@@ -575,7 +598,7 @@ export class CloudRenderer {
     const n = this.glyphs.length;
     if (!n) return;
     ctx.save();
-    ctx.font = `800 ${(GLYPH_SIZE * 1.15 * s).toFixed(1)}px ${this.fonts.display}`;
+    ctx.font = `800 ${(GLYPH_SIZE * s).toFixed(1)}px ${this.fonts.display}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = WORDMARK_MOSAIC.twinkle;
@@ -737,7 +760,7 @@ export class CloudRenderer {
         alive = true;
         const from = this.glyphPoint(L.glyph);
         const g = this.glyphs[L.glyph];
-        const toneColor = g.tone === 'health' ? WORDMARK_MOSAIC.health : WORDMARK_MOSAIC.name;
+        const toneColor = glyphColor(g);
         const to = targets[L.index] ?? targets[targets.length - 1] ?? fallback;
         const ch = text[L.index] ?? L.char;
         let pos: Point;

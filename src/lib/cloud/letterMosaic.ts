@@ -21,6 +21,8 @@ export type MosaicOptions = {
   threshold?: number;
   /** Share of a cell's pixels that must be inked for it to get a letter (thin serifs still count). */
   coverage?: number;
+  /** Share (0..1) of inked cells that get a letter; seeded, so the same cells every time. */
+  keep?: number;
   /** Max random offset of a letter from its cell centre, × cell. */
   jitter?: number;
 };
@@ -41,7 +43,7 @@ export function buildLetterMosaic(
   width: number,
   height: number,
   origin: { x: number; y: number },
-  { cell, seed, threshold = 110, coverage = 0.22, jitter = 0.12 }: MosaicOptions,
+  { cell, seed, threshold = 110, coverage = 0.22, keep = 1, jitter = 0.12 }: MosaicOptions,
 ): Glyph[] {
   const random = rng(seed);
   const glyphs: Glyph[] = [];
@@ -64,6 +66,7 @@ export function buildLetterMosaic(
         }
       }
       if (!total || inked / total < coverage) continue;
+      if (random() >= keep) continue;
       const i = best;
       const cx = left + cell / 2;
       const cy = top + cell / 2;
