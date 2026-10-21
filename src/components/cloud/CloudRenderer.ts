@@ -1,9 +1,10 @@
 // Screen 2 engine: responses → counts → masked layout (worker) → tween → canvas.
-import { BRAND, CLOUD_PALETTE } from '@/config/brand';
+// The wordmark under the crown is built from tiny letters; new answers' letters fly out of it into the crown.
+import { BRAND, CLOUD_PALETTE, WORDMARK_MOSAIC } from '@/config/brand';
 import { QUESTIONS } from '@/config/questions';
-import { STAGE } from '@/config/stage';
+import { MAX_DPR, STAGE } from '@/config/stage';
 import { CLOUD } from '@/config/timings';
-import { clamp, easeInOutCubic, lerp, progress, type Rect } from '@/lib/anim';
+import { clamp, easeInOutCubic, easeOutBack, easeOutCubic, lerp, lerpColor, progress, type Rect } from '@/lib/anim';
 import { aggregate, bucketedCountsKey, countsKey, optionKey, type Aggregate } from '@/lib/cloud/aggregate';
 import {
   BOX_HEIGHT,
@@ -17,9 +18,11 @@ import {
   type WordFont,
 } from '@/lib/cloud/layout';
 import type { LayoutRequest, LayoutResponse } from '@/lib/cloud/layout.worker';
+import { flightPoint, letterSchedule, letterTargets, type Point } from '@/lib/cloud/letterFlight';
+import { buildLetterMosaic, pickSource, type Glyph } from '@/lib/cloud/letterMosaic';
 import { createTransition, type FrameWord, type Transition } from '@/lib/cloud/tween';
 import { ensureFonts, fontFamilies, type FontFamilies } from '@/lib/fonts';
-import { loadMask, type LoadedMask } from '@/lib/mask/mask';
+import { containRect, loadMask, type LoadedMask } from '@/lib/mask/mask';
 import { outlineDots, type OutlineDot } from '@/lib/mask/outline';
 import { hashString } from '@/lib/random';
 import { DEFAULT_CONTROL, type ControlState, type ResponseDoc } from '@/types/models';
@@ -38,10 +41,14 @@ import type { DebugStats } from '@/components/stage/DebugOverlay';
 
 const W = STAGE.width;
 const H = STAGE.height;
-const CROWN_BOX: Rect = { x: W * 0.02, y: H * 0.035, w: W * 0.96, h: H * 0.68 };
-/** "George Steuart / HEALTH" under the crown cloud, wide enough to read as one stacked logo with it. */
-const WORDMARK_Y = H * 0.865;
-const WORDMARK_W = W * 0.8;
+const CROWN_BOX: Rect = { x: W * 0.02, y: H * 0.025, w: W * 0.96, h: H * 0.76 };
+/** "George Steuart / HEALTH" under the crown cloud, built from tiny letters. */
+const WORDMARK_Y = H * 0.89;
+const WORDMARK_W = W * WORDMARK_MOSAIC.widthRatio;
+/** Size of the letters the wordmark is made of. */
+const GLYPH_SIZE = WORDMARK_MOSAIC.cell * WORDMARK_MOSAIC.fontScale;
+/** Flying letters rise this far out of the wordmark before arcing into the crown. */
+const POP_LIFT = 12;
 const MASK_CELL = 3;
 const TAU = Math.PI * 2;
 /** Outline lights: distance outside the crown edge (cells) and spacing (stage px). */
@@ -50,7 +57,50 @@ const OUTLINE_SPACING = 20;
 /** Baseline offset from the word box centre, × font size. */
 const BASELINE: Record<WordFont, number> = { sans: BOX_HEIGHT.sans * 0.45, serif: 0.3 };
 
-type Flyer = { key: string; text: string; start: number; from: { x: number; y: number }; bend: number };
+/** One letter of a new answer: leaves glyph `glyph` of the wordmark and lands on letter `index` of the word. */
+type LetterFlight = { glyph: number; index: number; char: string; offset: number; bend: number; lift: number; lastSpark: number };
+type Flyer = { key: string; text: string; start: number; letters: LetterFlight[]; pulsed: boolean };
+
+/** Soft four-point star (thin cross of light around a small glow), for the sparks trailing flying letters. */
+function makeStarSprite(color: string, size = 48): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d')!;
+  const m = size / 2;
+  const core = ctx.createRadialGradient(m, m, 0, m, m, m * 0.45);
+  core.addColorStop(0, color);
+  core.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = core;
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = color;
+  for (const rot of [0, Math.PI / 2]) {
+    ctx.save();
+    ctx.translate(m, m);
+    ctx.rotate(rot);
+    // Long thin diamond: bright centre, tapering points.
+    ctx.beginPath();
+    ctx.moveTo(-m, 0);
+    ctx.quadraticCurveTo(0, -m * 0.09, m, 0);
+    ctx.quadraticCurveTo(0, m * 0.09, -m, 0);
+    ctx.fill();
+    ctx.restore();
+  }
+  return c;
+}
+
+const glyphColor = (g: Glyph) => (g.tone === 'health' ? WORDMARK_MOSAIC.health : WORDMARK_MOSAIC.name);
+
+/** Small stable integer hash, for picking twinkling glyphs. */
+function mix(n: number): number {
+  let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+const fontCss = (fonts: FontFamilies, font: WordFont, size: number) =>
+  font === 'serif' ? `700 ${size.toFixed(1)}px ${fonts.serif}` : `800 ${size.toFixed(1)}px ${fonts.display}`;
 
 /** Stable 0..1 per key, so each word twinkles / breathes on its own rhythm. */
 function phaseOf(key: string): number {
@@ -66,7 +116,27 @@ export class CloudRenderer {
   private outline: OutlineDot[] = [];
   private readonly outlineSprite: HTMLCanvasElement;
   private readonly sparkSprite: HTMLCanvasElement;
+  private readonly starSprite: HTMLCanvasElement;
   private readonly phases = new Map<string, number>();
+
+  /** Letter-mosaic wordmark: glyph positions + all of them pre-rendered once. */
+  private glyphs: Glyph[] = [];
+  private mosaic: { sprite: HTMLCanvasElement; rect: Rect } | null = null;
+  /** Current wordmark transform (it grows a little in the finale). */
+  private markScale = 1;
+  private markShift = 0;
+
+  /** Star sparks: a fixed ring buffer, reused (no per-frame allocation). */
+  private readonly sparks = {
+    x: new Float32Array(CLOUD.maxSparks),
+    y: new Float32Array(CLOUD.maxSparks),
+    vx: new Float32Array(CLOUD.maxSparks),
+    vy: new Float32Array(CLOUD.maxSparks),
+    size: new Float32Array(CLOUD.maxSparks),
+    born: new Float64Array(CLOUD.maxSparks).fill(-Infinity),
+  };
+  private sparkNext = 0;
+  private lastSparkAt = -Infinity;
 
   private control: ControlState = DEFAULT_CONTROL;
   private controlLoaded = false;
@@ -115,6 +185,7 @@ export class CloudRenderer {
     this.fonts = fontFamilies();
     this.outlineSprite = glowSprite(CLOUD_PALETTE.outline);
     this.sparkSprite = glowSprite('#FFD9DD');
+    this.starSprite = makeStarSprite(WORDMARK_MOSAIC.spark);
     try {
       this.worker = new Worker(new URL('../../lib/cloud/layout.worker.ts', import.meta.url), { type: 'module' });
       this.worker.onmessage = (e: MessageEvent<LayoutResponse>) => this.onLayout(e.data);
@@ -133,6 +204,7 @@ export class CloudRenderer {
     const [brand] = await Promise.all([loadBrandImages(), ensureFonts(this.fonts)]);
     this.brand = brand;
     this.measure();
+    this.buildMosaic();
     try {
       // Words fill the crown silhouette; crown.png (same crop box) is drawn faintly on the same rect.
       const m = await loadMask(BRAND.crownMask, W, H, CROWN_BOX, MASK_CELL);
@@ -145,6 +217,78 @@ export class CloudRenderer {
     this.needsLayout = true;
     this.lastLayoutAt = -Infinity;
     this.dirty = true;
+  }
+
+  /**
+   * Draw wordmark.png into its rect, read the pixels back and sprinkle small random letters into its thick
+   * strokes. The sprite = the real wordmark, faint, with the letters on top clipped to its shape (so none
+   * spill onto the black). Rendered once; a frame draws it with one drawImage.
+   */
+  private buildMosaic() {
+    const img = this.brand.wordmark;
+    if (!img) return;
+    const rect = containRect(img.naturalWidth, img.naturalHeight, {
+      x: (W - WORDMARK_W) / 2,
+      y: WORDMARK_Y - H * 0.15,
+      w: WORDMARK_W,
+      h: H * 0.3,
+    });
+    const w = Math.round(rect.w);
+    const h = Math.round(rect.h);
+    const src = document.createElement('canvas');
+    src.width = w;
+    src.height = h;
+    const sctx = src.getContext('2d', { willReadFrequently: true });
+    if (!sctx) return;
+    sctx.drawImage(img, 0, 0, w, h);
+    const { cell, seed, coverage, keep } = WORDMARK_MOSAIC;
+    this.glyphs = buildLetterMosaic(sctx.getImageData(0, 0, w, h).data, w, h, { x: rect.x, y: rect.y }, {
+      cell,
+      seed,
+      coverage,
+      keep,
+      jitter: 0.06,
+    });
+
+    const pad = Math.ceil(GLYPH_SIZE);
+    const out: Rect = { x: rect.x - pad, y: rect.y - pad, w: w + pad * 2, h: h + pad * 2 };
+    const dpr = Math.min(MAX_DPR, Math.max(1, window.devicePixelRatio || 1));
+    const sprite = document.createElement('canvas');
+    sprite.width = Math.round(out.w * dpr);
+    sprite.height = Math.round(out.h * dpr);
+    const ctx = sprite.getContext('2d')!;
+    ctx.scale(dpr, dpr);
+    // Frame: the real wordmark, faint.
+    ctx.globalAlpha = WORDMARK_MOSAIC.frameOpacity;
+    ctx.drawImage(img, pad, pad, w, h);
+    // Letters on their own layer, cut to the wordmark's shape, then laid over the frame.
+    const letters = document.createElement('canvas');
+    letters.width = sprite.width;
+    letters.height = sprite.height;
+    const lctx = letters.getContext('2d')!;
+    lctx.scale(dpr, dpr);
+    lctx.font = `800 ${GLYPH_SIZE.toFixed(1)}px ${this.fonts.display}`;
+    lctx.textAlign = 'center';
+    lctx.textBaseline = 'middle';
+    for (const g of this.glyphs) {
+      lctx.fillStyle = glyphColor(g);
+      lctx.fillText(g.char, g.x - out.x, g.y - out.y);
+    }
+    lctx.globalCompositeOperation = 'destination-in';
+    lctx.drawImage(img, pad, pad, w, h);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = WORDMARK_MOSAIC.letterOpacity;
+    ctx.drawImage(letters, 0, 0);
+    this.mosaic = { sprite, rect: out };
+  }
+
+  /** A wordmark glyph's position on screen right now (the wordmark grows slightly in the finale). */
+  private glyphPoint(i: number): Point {
+    const g = this.glyphs[i];
+    return {
+      x: W / 2 + (g.x - W / 2) * this.markScale,
+      y: WORDMARK_Y + (g.y - WORDMARK_Y) * this.markScale - this.markShift,
+    };
   }
 
   /** Text width per 1px of font size, for every label in both fonts. */
@@ -199,6 +343,7 @@ export class CloudRenderer {
       this.frameWords = [];
       this.pulses.clear();
       this.flyers = [];
+      this.sparks.born.fill(-Infinity);
       this.forceLayout();
     }
     if (!this.controlLoaded || next.mode !== prev.mode) {
@@ -233,22 +378,39 @@ export class CloudRenderer {
     this.dirty = true;
   }
 
-  /** A chosen word rises from the bottom and joins the crown; its hero pulses on arrival. */
+  /**
+   * A chosen word's letters pop out of matching letters in the wordmark, one after another, and fly into the
+   * word in the crown; the word pulses as they land.
+   */
   private spawnFlyer(key: string, now: number) {
-    if (this.flyers.length >= CLOUD.maxFlyers) {
+    if (this.flyers.length >= CLOUD.maxFlyers || !this.glyphs.length) {
       this.pulses.set(key, now);
       return;
     }
     const [qid, oid] = key.split(':');
     const label = QUESTIONS.find((q) => q.id === qid)?.options.find((o) => o.id === oid)?.label ?? '';
-    // Stagger + spread so a multi-select answer arrives as a little stream, not one blob.
+    const text = label.toUpperCase();
+    const indices = [...text].flatMap((ch, i) => (ch.trim() ? [i] : []));
+    if (!indices.length) return;
+    const offsets = letterSchedule(indices.length, CLOUD.letterStaggerMs);
+    // Stagger words so a multi-select answer arrives as a little stream, not one blob.
     const lane = this.flyers.length;
+    const bend = (Math.random() - 0.5) * W * 0.3;
     this.flyers.push({
       key,
-      text: label.toUpperCase(),
-      start: now + lane * 220,
-      from: { x: W * (0.2 + ((lane * 0.37 + Math.random() * 0.15) % 0.6)), y: H + 30 },
-      bend: (Math.random() - 0.5) * W * 0.5,
+      text,
+      start: now + lane * 260,
+      pulsed: false,
+      letters: indices.map((index, k) => ({
+        glyph: pickSource(this.glyphs, text[index]),
+        index,
+        char: text[index],
+        offset: offsets[k],
+        // Each letter takes a slightly different arc, like sparks off a wand.
+        bend: bend + (Math.random() - 0.5) * W * 0.12,
+        lift: H * (0.1 + Math.random() * 0.08),
+        lastSpark: -Infinity,
+      })),
     });
   }
 
@@ -349,7 +511,7 @@ export class CloudRenderer {
     }
 
     // "fast" = something is moving noticeably → full frame rate; otherwise idle motion at idleFps.
-    let fast = this.flyers.length > 0;
+    let fast = this.flyers.length > 0 || now - this.lastSparkAt < CLOUD.sparkLifeMs;
     if (this.transition) {
       const p = progress(now, this.transitionAt, CLOUD.tweenMs);
       this.frameWords = this.transition.sample(easeInOutCubic(p));
@@ -395,22 +557,99 @@ export class CloudRenderer {
 
     this.drawOutline(now, fin);
     this.drawWords(now);
-    this.drawFlyers(now);
 
     // Spotlight-question banner at the top, when shown.
     this.drawBanner(now);
-    drawWordmark(ctx, {
-      x: W / 2,
-      y: WORDMARK_Y - fin * 6,
-      // Wordmark only: the cloud above it is the crown.
-      width: WORDMARK_W * (1 + 0.04 * fin),
-      // Text size if the wordmark image is missing.
-      height: 90,
-      align: 'center',
-      fonts: this.fonts,
-      brand: this.brand,
-      crown: false,
-    });
+    this.markScale = 1 + 0.04 * fin;
+    this.markShift = fin * 6;
+    if (this.mosaic) {
+      this.drawMosaic(now);
+    } else {
+      // Image missing: plain text wordmark.
+      drawWordmark(ctx, {
+        x: W / 2,
+        y: WORDMARK_Y - this.markShift,
+        width: WORDMARK_W * this.markScale,
+        height: 70,
+        align: 'center',
+        fonts: this.fonts,
+        brand: this.brand,
+        crown: false,
+      });
+    }
+    this.drawSparks(now);
+    this.drawFlyers(now);
+  }
+
+  /** The letter-mosaic wordmark, with a few of its letters twinkling. */
+  private drawMosaic(now: number) {
+    const m = this.mosaic;
+    if (!m) return;
+    const ctx = this.ctx;
+    const s = this.markScale;
+    const r = m.rect;
+    ctx.drawImage(
+      m.sprite,
+      W / 2 + (r.x - W / 2) * s,
+      WORDMARK_Y + (r.y - WORDMARK_Y) * s - this.markShift,
+      r.w * s,
+      r.h * s,
+    );
+    const n = this.glyphs.length;
+    if (!n) return;
+    ctx.save();
+    ctx.font = `800 ${(GLYPH_SIZE * s).toFixed(1)}px ${this.fonts.display}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = WORDMARK_MOSAIC.twinkle;
+    const count = CLOUD.twinkleCount;
+    for (let k = 0; k < count; k++) {
+      // Each twinkle slot lights a different glyph per cycle, out of step with the others.
+      const t = now + (k * CLOUD.twinkleMs) / count;
+      const cycle = Math.floor(t / CLOUD.twinkleMs);
+      const p = (t % CLOUD.twinkleMs) / CLOUD.twinkleMs;
+      const i = mix(cycle * 131 + k) % n;
+      const pt = this.glyphPoint(i);
+      const a = Math.sin(Math.PI * p);
+      ctx.globalAlpha = 0.85 * a;
+      ctx.fillText(this.glyphs[i].char, pt.x, pt.y);
+    }
+    ctx.restore();
+  }
+
+  private emitSpark(x: number, y: number, now: number) {
+    const i = this.sparkNext;
+    this.sparkNext = (i + 1) % CLOUD.maxSparks;
+    const sp = this.sparks;
+    sp.x[i] = x + (Math.random() - 0.5) * 6;
+    sp.y[i] = y + (Math.random() - 0.5) * 6;
+    sp.vx[i] = (Math.random() - 0.5) * 50;
+    sp.vy[i] = (Math.random() - 0.5) * 40 - 8;
+    sp.size[i] = 9 + Math.random() * 12;
+    sp.born[i] = now;
+    this.lastSparkAt = now;
+  }
+
+  /** Soft star sparks drifting down and fading behind the flying letters. */
+  private drawSparks(now: number) {
+    if (now - this.lastSparkAt >= CLOUD.sparkLifeMs) return;
+    const ctx = this.ctx;
+    const sp = this.sparks;
+    const gravity = 45;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < CLOUD.maxSparks; i++) {
+      const age = (now - sp.born[i]) / CLOUD.sparkLifeMs;
+      if (!(age >= 0 && age < 1)) continue;
+      const t = (now - sp.born[i]) / 1000;
+      const x = sp.x[i] + sp.vx[i] * t;
+      const y = sp.y[i] + sp.vy[i] * t + 0.5 * gravity * t * t;
+      const twinkle = 0.6 + 0.4 * Math.sin(now / 70 + i * 1.7);
+      ctx.globalAlpha = 0.45 * (1 - age) ** 1.4 * twinkle;
+      const size = sp.size[i] * (1 - 0.5 * age);
+      ctx.drawImage(this.starSprite, x - size / 2, y - size / 2, size, size);
+    }
+    ctx.restore();
   }
 
   /** Lights along the crown edge (like the dotted arch in the logo) with a slow chase. */
@@ -461,8 +700,7 @@ export class CloudRenderer {
       ctx.globalAlpha = alpha;
       ctx.translate(w.x, w.y);
       if (w.rotate === 90) ctx.rotate(-Math.PI / 2);
-      ctx.font =
-        w.font === 'serif' ? `700 ${size.toFixed(1)}px ${this.fonts.serif}` : `800 ${size.toFixed(1)}px ${this.fonts.display}`;
+      ctx.font = fontCss(this.fonts, w.font, size);
       const y = size * BASELINE[w.font];
       // Red halo (two wide strokes, cheaper than shadowBlur): always on the top tier, briefly on a pulse.
       const halo = w.tier === 0 ? 1 : glow;
@@ -483,57 +721,102 @@ export class CloudRenderer {
   private drawFlyers(now: number) {
     if (!this.flyers.length) return;
     const ctx = this.ctx;
-    // Fly to the option's big word; if it isn't one (outside the top options), to one of its small copies.
-    const heroPos = new Map<string, { x: number; y: number }>();
-    for (const w of this.frameWords) if (w.layer === 'filler' && w.alpha > 0.5) heroPos.set(w.optionKey, w);
-    for (const w of this.frameWords) if (w.layer === 'hero' && w.alpha > 0.5) heroPos.set(w.optionKey, w);
+    // Land on the option's big word; if it isn't one (outside the top options), on one of its small copies.
+    const target = new Map<string, FrameWord>();
+    for (const w of this.frameWords) if (w.layer === 'filler' && w.alpha > 0.5) target.set(w.optionKey, w);
+    for (const w of this.frameWords) if (w.layer === 'hero' && w.alpha > 0.5) target.set(w.optionKey, w);
     const fallback = this.mask
       ? { x: this.mask.rect.x + this.mask.rect.w / 2, y: this.mask.rect.y + this.mask.rect.h * 0.6 }
       : { x: W / 2, y: H / 2 };
-
-    const at = (f: Flyer, to: { x: number; y: number }, p: number) => {
-      const c = { x: (f.from.x + to.x) / 2 + f.bend, y: Math.min(f.from.y, to.y) - H * 0.12 };
-      const u = 1 - p;
-      return {
-        x: u * u * f.from.x + 2 * u * p * c.x + p * p * to.x,
-        y: u * u * f.from.y + 2 * u * p * c.y + p * p * to.y,
-      };
-    };
+    const pop = CLOUD.letterPopMs;
+    const fly = CLOUD.letterFlyMs;
+    const land = CLOUD.letterLandMs;
 
     const done: Flyer[] = [];
     ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     for (const f of this.flyers) {
-      const raw = (now - f.start) / CLOUD.flyMs;
-      if (raw < 0) continue;
-      if (raw >= 1) {
-        done.push(f);
-        continue;
+      const w = target.get(f.key);
+      const text = w?.text ?? f.text;
+      const font: WordFont = w?.font ?? 'sans';
+      const size = w?.size ?? 26;
+      const rotate = w?.rotate === 90 ? 90 : 0;
+      ctx.font = fontCss(this.fonts, font, size);
+      const widths = [...text].map((ch) => ctx.measureText(ch).width);
+      const targets = letterTargets(w ?? fallback, widths, rotate);
+      const toColor = w?.color ?? BRAND.white;
+
+      let alive = false;
+      let allLanding = true;
+      for (const L of f.letters) {
+        const t = now - (f.start + L.offset);
+        if (t < pop + fly) allLanding = false;
+        if (t < 0) {
+          alive = true;
+          continue;
+        }
+        if (t >= pop + fly + land) continue;
+        alive = true;
+        const from = this.glyphPoint(L.glyph);
+        const g = this.glyphs[L.glyph];
+        const toneColor = glyphColor(g);
+        const to = targets[L.index] ?? targets[targets.length - 1] ?? fallback;
+        const ch = text[L.index] ?? L.char;
+        let pos: Point;
+        let letterSize: number;
+        let color: string;
+        let alpha = 1;
+        let angle = 0;
+        if (t < pop) {
+          // Pop: the letter swells up out of its spot in the wordmark with a soft flash.
+          const q = t / pop;
+          pos = { x: from.x, y: from.y - POP_LIFT * easeOutCubic(q) };
+          letterSize = GLYPH_SIZE * (1 + 0.9 * Math.max(0, easeOutBack(q)));
+          color = lerpColor(toneColor, BRAND.white, q);
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.45 * Math.sin(Math.PI * q);
+          ctx.drawImage(this.sparkSprite, from.x - 16, from.y - 16, 32, 32);
+          ctx.restore();
+        } else if (t < pop + fly) {
+          // Fly: arc up and over into its place in the word, growing to the word's size.
+          const q = easeInOutCubic((t - pop) / fly);
+          pos = flightPoint({ x: from.x, y: from.y - POP_LIFT }, to, L.bend, L.lift, q);
+          letterSize = lerp(GLYPH_SIZE * 1.9, size, q);
+          color = q < 0.6 ? BRAND.white : lerpColor(BRAND.white, toColor, (q - 0.6) / 0.4);
+          angle = rotate === 90 ? (-Math.PI / 2) * q : 0;
+          if (now - L.lastSpark >= CLOUD.sparkEveryMs) {
+            L.lastSpark = now;
+            this.emitSpark(pos.x, pos.y, now);
+          }
+        } else {
+          // Land: settle into the word and fade as the word pulses.
+          const q = (t - pop - fly) / land;
+          pos = to;
+          letterSize = size;
+          color = toColor;
+          alpha = 1 - q;
+          angle = rotate === 90 ? -Math.PI / 2 : 0;
+        }
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(pos.x, pos.y);
+        if (angle) ctx.rotate(angle);
+        ctx.font = fontCss(this.fonts, font, letterSize);
+        ctx.fillStyle = color;
+        // Same baseline as the word, so the letters land exactly on it.
+        ctx.fillText(ch, 0, letterSize * BASELINE[font]);
+        ctx.restore();
       }
-      const to = heroPos.get(f.key) ?? fallback;
-      const p = easeInOutCubic(raw);
-      // Spark with a short fading trail.
-      ctx.globalCompositeOperation = 'lighter';
-      for (let k = 5; k >= 0; k--) {
-        const pos = at(f, to, Math.max(0, p - k * 0.035));
-        const r = 14 - k * 2;
-        ctx.globalAlpha = (1 - k / 6) * 0.9;
-        ctx.drawImage(this.sparkSprite, pos.x - r, pos.y - r, r * 2, r * 2);
+      if (allLanding && !f.pulsed) {
+        f.pulsed = true;
+        this.pulses.set(f.key, now);
       }
-      // The word itself rides along and fades as it lands.
-      const head = at(f, to, p);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = raw < 0.7 ? 1 : (1 - raw) / 0.3;
-      ctx.font = `800 24px ${this.fonts.display}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = BRAND.white;
-      ctx.fillText(f.text, head.x, head.y + 14);
+      if (!alive) done.push(f);
     }
     ctx.restore();
-    if (done.length) {
-      for (const f of done) this.pulses.set(f.key, now);
-      this.flyers = this.flyers.filter((f) => !done.includes(f));
-    }
+    if (done.length) this.flyers = this.flyers.filter((f) => !done.includes(f));
   }
 
   /** Spotlight-question banner at the top. Returns how visible it is (0..1). */

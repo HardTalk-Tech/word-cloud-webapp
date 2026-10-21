@@ -49,6 +49,33 @@ export const CLOUD_PALETTE = {
   outline: '#FF4D5E',
 } as const;
 
+/**
+ * Screen 2 wordmark: the real "George Steuart / HEALTH" drawn faint as a frame, with a sprinkle of small
+ * random letters living inside its strokes (clipped to them).
+ */
+export const WORDMARK_MOSAIC = {
+  /** Wordmark width, × stage width. */
+  widthRatio: 0.6,
+  /** Opacity of the real wordmark underneath. */
+  frameOpacity: 0.35,
+  /** At most one letter per `cell` stage px, only where a stroke covers ≥ `coverage` of the cell. */
+  cell: 8,
+  coverage: 0.4,
+  /** Share of eligible cells that get a letter (a few stay empty so the faint frame shows through). */
+  keep: 0.88,
+  /** Letter size, × cell. */
+  fontScale: 0.95,
+  /** Letter colours: brighter tints of the stroke underneath. */
+  name: '#F2EEEA',
+  health: '#A8F2E8',
+  letterOpacity: 0.88,
+  /** Twinkling letters drawn brighter on top. */
+  twinkle: '#FFFFFF',
+  seed: 'gsh-wordmark',
+  /** Soft star sparks shed by letters flying out of the wordmark. */
+  spark: '#FFE6EA',
+} as const;
+
 /** CSS variables set by next/font in the root layout. Canvas code reads them at runtime. */
 export const FONT_VARS = {
   display: '--font-display',
