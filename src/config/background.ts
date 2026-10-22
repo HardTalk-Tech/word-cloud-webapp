@@ -7,8 +7,10 @@ export const BACKGROUND = {
   enabled: true,
   /** false = draw one still frame (lowest GPU use). */
   animate: true,
-  /** Background redraw rate; it moves slowly, 30 is plenty. */
-  fps: 30,
+  /** Background redraw rate; it moves slowly, so 20 looks the same as 30 at two-thirds of the cost. */
+  fps: 20,
+  /** Lights fainter than this are never drawn (they were invisible anyway). */
+  minDotAlpha: 0.05,
   seed: 'gs-bg',
   colors: {
     glow: '#4A0912',
@@ -19,8 +21,8 @@ export const BACKGROUND = {
   },
   variants: {
     /** Screen 1: photos are opaque, so the background can be rich. */
-    welcome: { intensity: 1, beams: 16, beamDots: 70, floorRows: 7, centerDarken: 0 },
+    welcome: { intensity: 1, beams: 14, beamDots: 45, floorRows: 5, centerDarken: 0 },
     /** Screen 2: red words sit on top, so keep it calmer and darken behind the crown. */
-    cloud: { intensity: 0.65, beams: 12, beamDots: 40, floorRows: 6, centerDarken: 0.7 },
+    cloud: { intensity: 0.65, beams: 10, beamDots: 28, floorRows: 4, centerDarken: 0.7 },
   } satisfies Record<BackgroundVariant, { intensity: number; beams: number; beamDots: number; floorRows: number; centerDarken: number }>,
 } as const;

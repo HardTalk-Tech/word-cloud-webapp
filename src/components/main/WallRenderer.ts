@@ -10,6 +10,7 @@ import { HEADER_H, WALL_AREA, gridBox, gridSlot } from '@/lib/wall/slots';
 import {
   clearStage,
   drawLogo,
+  stagePixelRatio,
   ellipsize,
   fitFontSize,
   glowSprite,
@@ -285,6 +286,29 @@ export class WallSprites {
   readonly sweep = makeSweepSprite();
   private tiles = new WeakMap<object, HTMLCanvasElement>();
   private labels = new Map<string, LabelSprite>();
+  private rings: HTMLCanvasElement | null = null;
+
+  /** The decorative ring outlines, drawn once on a stage-size canvas (they never move). */
+  ringLayer(): HTMLCanvasElement {
+    if (this.rings) return this.rings;
+    const dpr = stagePixelRatio(STAGE.width, STAGE.height);
+    const [c, ctx] = spriteCanvas(Math.round(STAGE.width * dpr), Math.round(STAGE.height * dpr));
+    ctx.scale(dpr, dpr);
+    const box = gridBox(WALL_AREA);
+    ctx.beginPath();
+    ctx.rect(0, WALL_AREA.y - 8, STAGE.width, STAGE.height - WALL_AREA.y + 8);
+    ctx.clip();
+    RING_PATTERN.radii.forEach((k, i) => {
+      ctx.globalAlpha = i % 2 ? 0.16 : 0.24;
+      ctx.lineWidth = i % 2 ? 1.5 : 2.5;
+      ctx.strokeStyle = BRAND.red;
+      ctx.beginPath();
+      ctx.arc(box.x + box.w / 2, box.y + box.h / 2, (box.w / 2) * k, 0, TAU);
+      ctx.stroke();
+    });
+    this.rings = c;
+    return c;
+  }
 
   /** Round tile sprite for a decoded image (created once per image). */
   tile(img: HTMLImageElement | null): HTMLCanvasElement | null {
@@ -339,17 +363,11 @@ export function drawRingPattern(ctx: CanvasRenderingContext2D, sprites: WallSpri
   const cy = box.y + box.h / 2;
   const half = box.w / 2;
   ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(sprites.ringLayer(), 0, 0, STAGE.width, STAGE.height);
   ctx.beginPath();
   ctx.rect(0, WALL_AREA.y - 8, STAGE.width, STAGE.height - WALL_AREA.y + 8);
   ctx.clip();
-  RING_PATTERN.radii.forEach((k, i) => {
-    ctx.globalAlpha = (i % 2 ? 0.16 : 0.24) * alpha;
-    ctx.lineWidth = i % 2 ? 1.5 : 2.5;
-    ctx.strokeStyle = BRAND.red;
-    ctx.beginPath();
-    ctx.arc(cx, cy, half * k, 0, TAU);
-    ctx.stroke();
-  });
   ctx.globalCompositeOperation = 'lighter';
   RING_PATTERN.radii.forEach((k, ring) => {
     const r = half * k;
@@ -359,10 +377,10 @@ export function drawRingPattern(ctx: CanvasRenderingContext2D, sprites: WallSpri
     for (let i = 0; i < 2; i++) {
       const a = dir * now * speed + i * Math.PI + ring * 1.3;
       // Short comet: a bright head and a fading tail.
-      for (let j = 0; j < 6; j++) {
-        const ta = a - dir * j * (0.035 / k);
-        const size = 30 - j * 4;
-        ctx.globalAlpha = alpha * 0.75 * (1 - j / 6);
+      for (let j = 0; j < 3; j++) {
+        const ta = a - dir * j * (0.06 / k);
+        const size = 30 - j * 7;
+        ctx.globalAlpha = alpha * 0.75 * (1 - j / 3);
         ctx.drawImage(sprites.spark, cx + Math.cos(ta) * r - size / 2, cy + Math.sin(ta) * r - size / 2, size, size);
       }
       ctx.globalAlpha = alpha * 0.45;

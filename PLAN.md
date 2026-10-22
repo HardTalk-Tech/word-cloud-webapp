@@ -432,6 +432,11 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 - One `requestAnimationFrame` loop per screen; skip drawing when nothing changes.
 - Only `drawImage` of decoded images; no per-frame image decoding, no per-frame filters.
 - Must hold **60fps with 1000 tiles** on the event laptop (test with the seed script).
+- Spotlight: the wall is not redrawn while the card fully covers it (`SPOT_HOLD`), and the animated background is paused (`setBackgroundPaused`) for the whole spotlight. The snapshot blur is a downscale (1/9 stage), not a canvas filter.
+- Idle wall redraws at `WALL.idleFps` (30) when only the ring lights move; pops / landings / spotlights run at full rate. Ring outlines are pre-rendered once.
+- Background at 20 fps with fewer lights; invisible lights are dropped. Confetti runs in a worker.
+- Canvas backing store = the device pixels the stage covers on this screen (`stagePixelRatio`), not a flat 2×.
+- Measured (offline harness, 4× CPU throttle, 1920×1080): spotlight avg frame 24–26 ms → 12–14 ms, p95 42 → 21–28 ms; idle avg 16–17 → 9–11 ms.
 
 ### 11.6 Screen 2 — crown word cloud
 

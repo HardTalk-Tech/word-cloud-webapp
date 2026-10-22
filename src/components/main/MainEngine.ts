@@ -11,6 +11,7 @@ import { catchUpIds, enqueue, initialQueue, removeId, tick, type QueueState } fr
 import { assignSlots, gridCapacity, gridSlot, wallWindow } from '@/lib/wall/slots';
 import { DEFAULT_CONTROL, type Attendee, type ControlState, type WallAttendee } from '@/types/models';
 import { NO_BRAND_IMAGES, drawWordmark, loadBrandImages, setupCanvas, type BrandImages } from '@/components/stage/canvas';
+import { setBackgroundPaused } from '@/components/stage/BackgroundRenderer';
 import type { DebugStats } from '@/components/stage/DebugOverlay';
 import { FinalMosaic } from './FinalMosaic';
 import { SpotlightRenderer, type SpotPerson } from './SpotlightRenderer';
@@ -104,6 +105,7 @@ export class MainEngine {
   private ambient: { id: string; start: number } | null = null;
   private nextAmbientAt = 0;
   private dirty = true;
+  private lastDrawAt = 0;
   private visibleIdsKey = '';
 
   private raf = 0;
@@ -168,6 +170,7 @@ export class MainEngine {
   destroy() {
     this.destroyed = true;
     cancelAnimationFrame(this.raf);
+    setBackgroundPaused(false);
     this.spot.reset();
     this.cache.clear();
   }
@@ -420,12 +423,28 @@ export class MainEngine {
     }
     for (const [id, at] of this.recent) if (now - at >= WALL.newArrivalMs) this.recent.delete(id);
 
-    // The ring pattern keeps moving; only a settled final crown can skip frames.
+    // The spotlight covers the whole screen; the slow background can hold still meanwhile.
+    setBackgroundPaused(!idle);
+
+    // Settled final crown: nothing moves. Idle wall with only the slow ring lights moving: idleFps is enough.
     const settledFinal = this.final.state === 'on' && !this.final.isAnimating(now) && idle;
     if (settledFinal && !this.dirty) return;
+    const busy = !idle || this.final.isAnimating(now) || this.ambient !== null || now - this.sweepAt < WALL.sweepMs || this.tilesBusy(now);
+    if (!busy && !this.dirty && now - this.lastDrawAt < 1000 / WALL.idleFps) return;
     this.draw(now);
+    this.lastDrawAt = now;
     this.drawn++;
     this.dirty = false;
+  }
+
+  /** A tile is popping in, landing, glowing or leaving. */
+  private tilesBusy(now: number): boolean {
+    const appearMs = Math.max(WALL.popMs, WALL.landBounceMs, WALL.landGlowMs);
+    for (const t of this.tiles.values()) {
+      if (t.leaveAt !== null) return true;
+      if (t.appear !== 'none' && now - t.appearAt < appearMs) return true;
+    }
+    return false;
   }
 
   /** Best decoded image for a wall circle: the spotlight photo once it is in (circles are bigger than a tile). */
@@ -436,6 +455,11 @@ export class MainEngine {
   private draw(now: number) {
     const ctx = this.ctx;
     drawBackground(ctx);
+    // Spotlight fully up: its blurred snapshot of the wall covers everything, so skip drawing the wall under it.
+    if (this.queue.phase === 'SPOT_HOLD' && !this.final.active) {
+      this.drawSpotlight(now);
+      return;
+    }
     const fin = this.final.amount(now);
     const wallA = 1 - fin;
     drawWatermark(ctx, this.brand.crown, this.watermarkRect, wallA);
@@ -577,6 +601,10 @@ export class MainEngine {
       });
     }
 
+    this.drawSpotlight(now);
+  }
+
+  private drawSpotlight(now: number) {
     if (this.queue.phase !== 'WALL_IDLE') {
       const q = this.queue;
       const dur = q.phase === 'SPOT_IN' ? SPOTLIGHT.inMs : q.phase === 'SPOT_HOLD' ? q.holdMs : SPOTLIGHT.flyMs;
@@ -586,7 +614,7 @@ export class MainEngine {
         const img = a ? (this.cache.get(a.spotUrl) ?? this.cache.get(a.tileUrl) ?? this.cache.get(a.lqip) ?? null) : null;
         return { id, name: a?.name ?? '', department: a?.department ?? '', img, target: t ? tileRect(t) : null };
       });
-      this.spot.draw(ctx, q.phase, progress(now, q.phaseStartedAt, dur), people);
+      this.spot.draw(this.ctx, q.phase, progress(now, q.phaseStartedAt, dur), people);
     }
   }
 
@@ -622,7 +650,7 @@ export class MainEngine {
       images: this.cache.size,
       mode: `${this.control.mode}${this.control.welcomePaused ? ' (paused)' : ''} · final ${this.final.state}`,
       epoch: this.control.epoch,
-      stage: `${W}×${H} @${Math.min(2, window.devicePixelRatio || 1)}x`,
+      stage: `${W}×${H} @${(this.ctx.canvas.width / W).toFixed(2)}x`,
       synced: this.initialised ? 'yes' : 'waiting for server',
     };
   }

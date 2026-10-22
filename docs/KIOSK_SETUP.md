@@ -15,7 +15,8 @@ Screen 2 (second LED wall) = crown word cloud.
    Set each wall output to the LED processor's input resolution. **Scale = 100 %** on both walls.
 2. **Power**: plugged in, *Best performance*; screen off / sleep = **Never**; lid close = **Do nothing**.
 3. **Focus / Do Not Disturb** on. **Pause Windows Update** for 1 week. Taskbar → *Automatically hide*.
-4. Chrome → Settings → System → **Use graphics acceleration when available** = on.
+4. Chrome → Settings → System → **Use graphics acceleration when available** = on. Check `chrome://gpu`: Canvas should say "Hardware accelerated".
+   Use Chrome for the screens, not Opera GX (its GX Control CPU/RAM limiters and battery saver throttle the animation).
 
 ## 3. Launch the screens
 Find each wall's left x-coordinate (Display settings shows the arrangement; e.g. laptop 1920 wide →

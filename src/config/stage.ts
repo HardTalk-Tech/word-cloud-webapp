@@ -4,7 +4,7 @@ export const STAGE = {
   height: 1170,
 } as const;
 
-/** Canvas backing store = stage size x devicePixelRatio, capped. */
+/** Cap on the canvas backing-store scale (see `stagePixelRatio`: the device pixels the stage covers on screen). */
 export const MAX_DPR = 2;
 
 /** Main wall: top band reserved for the stacked George Steuart Health logo. */

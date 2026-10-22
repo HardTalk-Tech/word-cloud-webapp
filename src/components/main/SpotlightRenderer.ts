@@ -102,6 +102,7 @@ function makeBeams(): HTMLCanvasElement {
 
 export class SpotlightRenderer {
   private snapshot: HTMLCanvasElement | null = null;
+  private snapshotMid: HTMLCanvasElement | null = null;
   private fire: confetti.CreateTypes | null = null;
   private readonly beams = makeBeams();
 
@@ -112,19 +113,30 @@ export class SpotlightRenderer {
     if (confettiCanvas) {
       confettiCanvas.width = W;
       confettiCanvas.height = H;
-      this.fire = confetti.create(confettiCanvas, { resize: false, useWorker: false, disableForReducedMotion: false });
+      // Worker: the confetti animates off the main thread (canvas-confetti falls back if OffscreenCanvas is missing).
+      this.fire = confetti.create(confettiCanvas, { resize: false, useWorker: true, disableForReducedMotion: false });
     }
   }
 
-  /** Blur + dim the current wall once per spotlight (never per frame). */
+  /**
+   * Blur + dim the current wall once per spotlight (never per frame). The blur comes from shrinking the wall
+   * to a small canvas and stretching it back up when drawn: same soft look as a blur filter, far cheaper.
+   */
   takeSnapshot(source: HTMLCanvasElement) {
+    // Two halving steps (1/3 then 1/9 of the stage) so the small copy is smooth, not jagged.
+    const mid = this.snapshotMid ?? document.createElement('canvas');
+    mid.width = Math.round(W / 3);
+    mid.height = Math.round(H / 3);
+    const m = mid.getContext('2d')!;
+    m.imageSmoothingQuality = 'medium';
+    m.drawImage(source, 0, 0, mid.width, mid.height);
+    this.snapshotMid = mid;
     const c = this.snapshot ?? document.createElement('canvas');
-    c.width = Math.round(W / 2);
-    c.height = Math.round(H / 2);
+    c.width = Math.round(W / 9);
+    c.height = Math.round(H / 9);
     const ctx = c.getContext('2d')!;
-    ctx.filter = 'blur(5px)';
-    ctx.drawImage(source, 0, 0, c.width, c.height);
-    ctx.filter = 'none';
+    ctx.imageSmoothingQuality = 'medium';
+    ctx.drawImage(mid, 0, 0, c.width, c.height);
     ctx.fillStyle = 'rgba(11,11,13,0.65)';
     ctx.fillRect(0, 0, c.width, c.height);
     this.snapshot = c;
@@ -135,9 +147,9 @@ export class SpotlightRenderer {
     if (!fire) return;
     const colors = [...BRAND.confetti];
     const base = { colors, ticks: 220, gravity: 0.9, scalar: 1.6, startVelocity: 55 };
-    void fire({ ...base, particleCount: 90, spread: 70, angle: 60, origin: { x: 0, y: 0.75 } });
-    void fire({ ...base, particleCount: 90, spread: 70, angle: 120, origin: { x: 1, y: 0.75 } });
-    void fire({ ...base, particleCount: 60, spread: 110, startVelocity: 40, origin: { x: 0.5, y: 0.35 } });
+    void fire({ ...base, particleCount: 60, spread: 70, angle: 60, origin: { x: 0, y: 0.75 } });
+    void fire({ ...base, particleCount: 60, spread: 70, angle: 120, origin: { x: 1, y: 0.75 } });
+    void fire({ ...base, particleCount: 40, spread: 110, startVelocity: 40, origin: { x: 0.5, y: 0.35 } });
   }
 
   reset() {
