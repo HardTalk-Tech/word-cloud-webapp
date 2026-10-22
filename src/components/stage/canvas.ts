@@ -4,7 +4,17 @@ import { BRAND } from '@/config/brand';
 import type { FontFamilies } from '@/lib/fonts';
 
 /**
- * Size a canvas to the stage: CSS size = stage px, backing store = stage × dpr (capped).
+ * Backing-store scale for a `w`×`h` stage: the device pixels it really covers when scaled to fit the screen
+ * (screen size, not window size, so going full screen after load stays sharp), never below 1, capped.
+ */
+export function stagePixelRatio(w: number, h: number): number {
+  const dpr = window.devicePixelRatio || 1;
+  const fit = Math.min(window.screen.width / w, window.screen.height / h) || 1;
+  return Math.min(MAX_DPR, Math.max(1, dpr * fit));
+}
+
+/**
+ * Size a canvas to the stage: CSS size = stage px, backing store = the pixels it covers on screen (capped).
  * `transparent` for screen canvases layered over the animated background.
  */
 export function setupCanvas(
@@ -13,7 +23,7 @@ export function setupCanvas(
   h: number,
   { transparent = false }: { transparent?: boolean } = {},
 ): CanvasRenderingContext2D {
-  const dpr = Math.min(MAX_DPR, Math.max(1, window.devicePixelRatio || 1));
+  const dpr = stagePixelRatio(w, h);
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
   canvas.style.width = `${w}px`;

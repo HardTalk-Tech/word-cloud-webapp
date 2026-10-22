@@ -10,6 +10,14 @@ type Dot = { x: number; y: number; r: number; alpha: number; speed: number; phas
 
 const TAU = Math.PI * 2;
 
+/** While a screen is busy with a big animation (e.g. the welcome spotlight) the background holds still. */
+let paused = false;
+
+/** Freeze / resume every background on the page (it keeps its last frame; nothing is redrawn while paused). */
+export function setBackgroundPaused(value: boolean) {
+  paused = value;
+}
+
 function canvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(w));
@@ -173,6 +181,10 @@ export class BackgroundRenderer {
         });
       }
     }
+    // Drop lights too faint to see (mostly the far sides of the bokeh floor): fewer draws, same picture.
+    const visible = this.dots.filter((d) => d.alpha * this.intensity >= BACKGROUND.minDotAlpha);
+    this.dots.length = 0;
+    this.dots.push(...visible);
   }
 
   start() {
@@ -182,7 +194,7 @@ export class BackgroundRenderer {
     const loop = (now: number) => {
       if (this.destroyed) return;
       this.raf = requestAnimationFrame(loop);
-      if (now - this.last < frameMs) return;
+      if (paused || now - this.last < frameMs) return;
       this.last = now;
       this.draw(now);
     };

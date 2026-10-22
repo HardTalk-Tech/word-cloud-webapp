@@ -2,7 +2,7 @@
 // The wordmark under the crown is built from tiny letters; new answers' letters fly out of it into the crown.
 import { BRAND, CLOUD_PALETTE, WORDMARK_MOSAIC } from '@/config/brand';
 import { QUESTIONS } from '@/config/questions';
-import { MAX_DPR, STAGE } from '@/config/stage';
+import { STAGE } from '@/config/stage';
 import { CLOUD } from '@/config/timings';
 import { clamp, easeInOutCubic, easeOutBack, easeOutCubic, lerp, lerpColor, progress, type Rect } from '@/lib/anim';
 import { aggregate, bucketedCountsKey, countsKey, optionKey, type Aggregate } from '@/lib/cloud/aggregate';
@@ -35,6 +35,7 @@ import {
   glowSprite,
   loadBrandImages,
   setupCanvas,
+  stagePixelRatio,
   type BrandImages,
 } from '@/components/stage/canvas';
 import type { DebugStats } from '@/components/stage/DebugOverlay';
@@ -252,7 +253,7 @@ export class CloudRenderer {
 
     const pad = Math.ceil(GLYPH_SIZE);
     const out: Rect = { x: rect.x - pad, y: rect.y - pad, w: w + pad * 2, h: h + pad * 2 };
-    const dpr = Math.min(MAX_DPR, Math.max(1, window.devicePixelRatio || 1));
+    const dpr = stagePixelRatio(W, H);
     const sprite = document.createElement('canvas');
     sprite.width = Math.round(out.w * dpr);
     sprite.height = Math.round(out.h * dpr);
@@ -864,7 +865,7 @@ export class CloudRenderer {
       focus: this.focusTo ?? 'all',
       mode: this.control.mode,
       epoch: this.control.epoch,
-      stage: `${W}×${H} @${Math.min(2, window.devicePixelRatio || 1)}x`,
+      stage: `${W}×${H} @${(this.ctx.canvas.width / W).toFixed(2)}x`,
     };
   }
 }

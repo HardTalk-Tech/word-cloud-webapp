@@ -36,6 +36,8 @@ export const WALL = {
   exitMs: 800,
   /** Light pulses travelling round the decorative rings. */
   orbitPulseMs: 9000,
+  /** Redraw rate when only the slow ring lights are moving (pops, landings and spotlights run at full rate). */
+  idleFps: 30,
 } as const;
 
 export const FINAL = {
