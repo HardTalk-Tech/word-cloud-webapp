@@ -7,12 +7,7 @@ export type Phase = 'WALL_IDLE' | 'SPOT_IN' | 'SPOT_HOLD' | 'SPOT_FLY';
 export type QueueConfig = {
   inMs: number;
   flyMs: number;
-  holdShortMs: number;
-  holdMediumMs: number;
-  holdGroupMs: number;
-  shortQueueMax: number;
-  mediumQueueMax: number;
-  groupMax: number;
+  holdMs: number;
   imageWaitMs: number;
 };
 
@@ -64,11 +59,12 @@ export function removeId(s: QueueState, id: string): QueueState {
   return { ...s, queue, current };
 }
 
-/** Group size and hold time for the next spotlight, given the queue length. */
-export function planNext(queueLength: number, cfg: QueueConfig = SPOTLIGHT): { size: number; holdMs: number } {
-  if (queueLength > cfg.mediumQueueMax) return { size: Math.min(cfg.groupMax, queueLength), holdMs: cfg.holdGroupMs };
-  if (queueLength > cfg.shortQueueMax) return { size: 1, holdMs: cfg.holdMediumMs };
-  return { size: 1, holdMs: cfg.holdShortMs };
+/**
+ * The next spotlight: always one person, the same time for everyone, however long the queue gets
+ * (a burst plays as a steady stream; nobody is skipped).
+ */
+export function planNext(cfg: QueueConfig = SPOTLIGHT): { size: number; holdMs: number } {
+  return { size: 1, holdMs: cfg.holdMs };
 }
 
 export function tick(
@@ -82,7 +78,7 @@ export function tick(
       if (paused || s.queue.length === 0) {
         return { state: s.waitingSince === null ? s : { ...s, waitingSince: null }, events: [] };
       }
-      const { size, holdMs } = planNext(s.queue.length, cfg);
+      const { size, holdMs } = planNext(cfg);
       const next = s.queue.slice(0, size);
       const timedOut = s.waitingSince !== null && now - s.waitingSince >= cfg.imageWaitMs;
       if (!next.every(isReady) && !timedOut) {

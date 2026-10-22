@@ -30,20 +30,29 @@ describe('queue', () => {
     expect(s.queue).toEqual(['a', 'b', 'c']);
   });
 
-  it('chooses hold time by queue length and groups bursts', () => {
-    expect(planNext(1)).toEqual({ size: 1, holdMs: SPOTLIGHT.holdShortMs });
-    expect(planNext(3)).toEqual({ size: 1, holdMs: SPOTLIGHT.holdShortMs });
-    expect(planNext(4)).toEqual({ size: 1, holdMs: SPOTLIGHT.holdMediumMs });
-    expect(planNext(10)).toEqual({ size: 1, holdMs: SPOTLIGHT.holdMediumMs });
-    expect(planNext(11)).toEqual({ size: 4, holdMs: SPOTLIGHT.holdGroupMs });
+  it('always one person, same hold for everyone', () => {
+    expect(planNext()).toEqual({ size: 1, holdMs: SPOTLIGHT.holdMs });
   });
 
-  it('handles a burst of 50 fully, in order, with group spotlights', () => {
-    const ids = Array.from({ length: 50 }, (_, i) => `p${i}`);
-    const { groups } = drain(enqueue(initialQueue(), ids));
+  it('each spotlight takes 3 s in total (in + hold + fly)', () => {
+    expect(SPOTLIGHT.inMs + SPOTLIGHT.holdMs + SPOTLIGHT.flyMs).toBe(3000);
+  });
+
+  it('a burst of 30 plays one person at a time, in order, nobody skipped, ~3 s each', () => {
+    const ids = Array.from({ length: 30 }, (_, i) => `p${i}`);
+    const { groups, now } = drain(enqueue(initialQueue(), ids));
     expect(groups.flat()).toEqual(ids);
-    expect(groups[0]).toHaveLength(4);
-    expect(groups.at(-1)).toHaveLength(1);
+    expect(groups.every((g) => g.length === 1)).toBe(true);
+    // 30 × 3 s, plus at most a few 16 ms ticks between people.
+    expect(now).toBeGreaterThanOrEqual(30 * 3000);
+    expect(now).toBeLessThan(30 * 3000 + 30 * 3 * 16 + 100);
+  });
+
+  it('a huge backlog still spotlights everyone one by one', () => {
+    const ids = Array.from({ length: 120 }, (_, i) => `q${i}`);
+    const { groups } = drain(enqueue(initialQueue(), ids));
+    expect(groups).toHaveLength(120);
+    expect(groups.flat()).toEqual(ids);
   });
 
   it('goes through IN → HOLD → FLY → IDLE with events', () => {

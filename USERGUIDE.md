@@ -91,8 +91,7 @@ URL: <http://localhost:3000/screen/dev/welcome?debug=1>
 - **Idle glow:** every 2–3 s a random circle grows slightly with a red ring.
 - **Welcome spotlight:** when someone registers, the wall dims, confetti fires, a big card shows
   *Welcome* + their name, then the photo flies into its spot on the wall.
-  - Several arrivals queue up and are shown one by one (shorter holds when the queue is long).
-  - More than 10 waiting → groups of up to 4 people at once.
+  - Several arrivals queue up and are shown **one by one, 3 s each** (nobody is skipped: 30 people at once take ~90 s).
 
 **Debug overlay (`?debug=1`):** fps, attendees, queue length, current phase, photos on the wall (n/25), mode, epoch,
 stage size and **synced** (yes = live data from the server). Remove `?debug=1` for the clean view.
@@ -101,6 +100,13 @@ stage size and **synced** (yes = live data from the server). Remove `?debug=1` f
 ```bash
 npm run seed -- --event dev --count 5 --delay 3000    # 5 people, one every 3 s
 ```
+The same command works in **Windows PowerShell** (which drops the `--`): the script then reads the options from
+npm's own command line and prints `(read options from the npm command line: …)`. If they still can't be read it
+stops with a message instead of seeding the default 100 people.
+
+**Simultaneous registrations:** leave out `--delay` and everyone is written at once (16 in parallel), e.g.
+`npm run seed -- --event dev --count 20`. For a timed burst of real-looking phone uploads use
+`npm run load-test -- --event dev --mode burst` (50 in 30 s). Screen 1 queues them and shows one at a time.
 
 The page renders a fixed 1248 × 1170 stage scaled to fit the window (black bars on the sides are normal).
 Press **F11** for full screen.

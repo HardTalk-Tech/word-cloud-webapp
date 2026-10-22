@@ -1,13 +1,11 @@
+/**
+ * Welcome spotlight: one person at a time, 3 s each (in + hold + fly into their circle), whatever the queue.
+ * 30 people arriving together play out in ~90 s.
+ */
 export const SPOTLIGHT = {
-  inMs: 600,
-  flyMs: 900,
-  /** Queue length (including the person being shown) → hold time. */
-  holdShortMs: 3500, // queue 1–3
-  holdMediumMs: 2000, // queue 4–10
-  holdGroupMs: 3000, // queue > 10
-  shortQueueMax: 3,
-  mediumQueueMax: 10,
-  groupMax: 4,
+  inMs: 500,
+  holdMs: 1800,
+  flyMs: 700,
   /** Wait at most this long for the spot photo to decode before showing the tile/lqip instead. */
   imageWaitMs: 4000,
   /** Max attendees re-queued after a page reload. */
