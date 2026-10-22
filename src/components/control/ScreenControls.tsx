@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { QUESTIONS } from '@/config/questions';
+import { THEMES, THEME_IDS, type ThemeId } from '@/config/themes';
 import { updateControl, type ControlPatch } from '@/lib/services/control';
 import { downloadBlob, downloadText } from '@/lib/export/download';
 import { useClientValue } from '@/lib/use-client-value';
+import { EventTitle } from '@/components/EventTitle';
 import type { ControlState } from '@/types/models';
 
 function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -18,10 +20,129 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
       className="flex w-full items-center justify-between rounded-xl bg-surface-raised px-4 py-3 text-left ring-1 ring-line"
     >
       <span className="text-sm font-semibold">{label}</span>
-      <span className={`relative h-7 w-12 rounded-full transition ${on ? 'bg-brand' : 'bg-line'}`}>
+      <span className={`relative h-7 w-12 shrink-0 rounded-full transition ${on ? 'bg-brand' : 'bg-line'}`}>
         <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${on ? 'left-6' : 'left-1'}`} />
       </span>
     </button>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-xs font-semibold tracking-wide text-brand-grey uppercase">{children}</div>;
+}
+
+/** Colour theme for both LED screens (and the event name it carries). */
+function ThemePicker({ value, onChange }: { value: ThemeId; onChange: (id: ThemeId) => void }) {
+  return (
+    <div>
+      <SectionLabel>Screen theme</SectionLabel>
+      <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Screen theme">
+        {THEME_IDS.map((id) => {
+          const t = THEMES[id];
+          const on = id === value;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => !on && onChange(id)}
+              className={`rounded-xl p-3 text-left ring-1 transition ${
+                on ? 'bg-surface-raised ring-2 ring-white' : 'bg-surface-raised/60 ring-line hover:ring-brand-grey'
+              }`}
+            >
+              {/* Preview: the theme's colours as a small stage. */}
+              <span
+                className="relative block h-12 overflow-hidden rounded-lg"
+                style={{ background: `radial-gradient(120% 90% at 50% 0%, ${t.swatch[1]}55, ${t.swatch[0]} 60%)` }}
+                aria-hidden
+              >
+                {[18, 42, 66, 84].map((x, i) => (
+                  <span
+                    key={x}
+                    className="absolute h-1.5 w-1.5 rounded-full"
+                    style={{ left: `${x}%`, top: `${30 + (i % 2) * 30}%`, background: i % 2 ? t.swatch[2] : t.swatch[1] }}
+                  />
+                ))}
+                {on && (
+                  <span className="absolute top-1.5 right-1.5 rounded-full bg-white px-1.5 text-[10px] font-extrabold text-ink">
+                    ON
+                  </span>
+                )}
+              </span>
+              <span className="mt-2 block text-sm font-bold">{t.label}</span>
+              <span className="mt-0.5 block text-[11px] leading-tight font-bold tracking-wide uppercase">
+                <EventTitle event={t.event} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-brand-grey">
+        Changes both LED screens live and the event name on phones. Phone colours stay the same.
+      </p>
+    </div>
+  );
+}
+
+export function ScreenControls({ eventId, control }: { eventId: string; control: ControlState }) {
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (patch: ControlPatch) => {
+    setError(null);
+    updateControl(eventId, patch).catch((e: Error) => setError(e.message));
+  };
+
+  return (
+    <section className="flex flex-col gap-5 rounded-2xl bg-surface p-5 ring-1 ring-line">
+      <h2 className="text-base font-bold">Screen controls</h2>
+      {error && <p className="-mt-3 text-sm text-red-400">{error}</p>}
+
+      <ThemePicker value={control.theme} onChange={(theme) => set({ theme })} />
+
+      <div>
+        <SectionLabel>Mode</SectionLabel>
+        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-surface-raised p-1 ring-1 ring-line">
+          {(['live', 'final'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => set({ mode: m })}
+              className={`h-11 rounded-lg text-sm font-bold capitalize transition ${control.mode === m ? 'bg-brand text-white' : 'text-brand-grey-light hover:text-white'}`}
+            >
+              {m === 'live' ? 'Live' : 'Final crown'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Toggle label="Pause welcome spotlight" on={control.welcomePaused} onChange={(v) => set({ welcomePaused: v })} />
+        <Toggle
+          label="Auto-rotate cloud questions (30s)"
+          on={control.autoRotateQuestions}
+          onChange={(v) => set({ autoRotateQuestions: v })}
+        />
+      </div>
+
+      <div>
+        <SectionLabel>Cloud spotlight question</SectionLabel>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {[null, ...QUESTIONS.map((q) => q.id)].map((id) => (
+            <button
+              key={id ?? 'all'}
+              disabled={control.autoRotateQuestions}
+              title={id ? QUESTIONS.find((q) => q.id === id)?.text : 'All questions'}
+              onClick={() => set({ spotlightQuestion: id })}
+              className={`h-9 rounded-lg px-3 text-sm font-bold uppercase ring-1 transition disabled:opacity-40 ${
+                control.spotlightQuestion === id ? 'bg-white text-ink ring-white' : 'text-brand-grey-light ring-line hover:text-white'
+              }`}
+            >
+              {id ?? 'All'}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -29,7 +150,12 @@ function CopyLink({ label, url }: { label: string; url: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex items-center gap-2">
-      <a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate rounded-lg bg-surface-raised px-3 py-2 text-sm ring-1 ring-line hover:ring-brand">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="min-w-0 flex-1 truncate rounded-lg bg-surface-raised px-3 py-2 text-sm ring-1 ring-line hover:ring-brand"
+      >
         <span className="text-brand-grey">{label}: </span>
         <span className="text-white">{url}</span>
       </a>
@@ -49,21 +175,16 @@ function CopyLink({ label, url }: { label: string; url: string }) {
   );
 }
 
-export function ScreenControls({ eventId, control }: { eventId: string; control: ControlState }) {
+/** Screen URLs, the QR target and QR downloads. */
+export function ShareLinks({ eventId }: { eventId: string }) {
   const origin = useClientValue(() => window.location.origin, '');
   const [qr, setQr] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const joinUrl = `${origin}/e/${eventId}`;
 
   useEffect(() => {
     if (!origin) return;
     void QRCode.toDataURL(joinUrl, { width: 240, margin: 1, color: { dark: '#0B0B0D', light: '#FFFFFF' } }).then(setQr);
   }, [origin, joinUrl]);
-
-  const set = (patch: ControlPatch) => {
-    setError(null);
-    updateControl(eventId, patch).catch((e: Error) => setError(e.message));
-  };
 
   const downloadQr = async (kind: 'png' | 'svg') => {
     if (kind === 'svg') {
@@ -77,65 +198,28 @@ export function ScreenControls({ eventId, control }: { eventId: string; control:
 
   return (
     <section className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-      <h2 className="text-base font-bold">Screen controls</h2>
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-
-      <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-surface-raised p-1 ring-1 ring-line">
-        {(['live', 'final'] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => set({ mode: m })}
-            className={`h-11 rounded-lg text-sm font-bold capitalize transition ${control.mode === m ? 'bg-brand text-white' : 'text-brand-grey-light hover:text-white'}`}
-          >
-            {m === 'live' ? 'Live' : 'Final crown'}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-3 flex flex-col gap-2">
-        <Toggle label="Pause welcome spotlight" on={control.welcomePaused} onChange={(v) => set({ welcomePaused: v })} />
-        <Toggle
-          label="Auto-rotate cloud questions (30s)"
-          on={control.autoRotateQuestions}
-          onChange={(v) => set({ autoRotateQuestions: v })}
-        />
-      </div>
-
-      <div className="mt-4">
-        <div className="text-xs font-semibold tracking-wide text-brand-grey uppercase">Cloud spotlight question</div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {[null, ...QUESTIONS.map((q) => q.id)].map((id) => (
-            <button
-              key={id ?? 'all'}
-              disabled={control.autoRotateQuestions}
-              title={id ? QUESTIONS.find((q) => q.id === id)?.text : 'All questions'}
-              onClick={() => set({ spotlightQuestion: id })}
-              className={`h-9 rounded-lg px-3 text-sm font-bold uppercase ring-1 transition disabled:opacity-40 ${
-                control.spotlightQuestion === id ? 'bg-white text-ink ring-white' : 'text-brand-grey-light ring-line hover:text-white'
-              }`}
-            >
-              {id ?? 'All'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-5 flex flex-col gap-2">
+      <h2 className="text-base font-bold">Links &amp; QR</h2>
+      <div className="mt-4 flex flex-col gap-2">
         <CopyLink label="Screen 1" url={`${origin}/screen/${eventId}/welcome`} />
         <CopyLink label="Screen 2" url={`${origin}/screen/${eventId}/cloud`} />
         <CopyLink label="QR target" url={joinUrl} />
       </div>
-
       <div className="mt-4 flex items-center gap-4">
         {qr && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={qr} alt={`QR code for ${joinUrl}`} className="h-28 w-28 rounded-lg bg-white p-1" />
         )}
         <div className="flex flex-col gap-2">
-          <button onClick={() => void downloadQr('png')} className="h-9 rounded-lg px-3 text-sm font-bold ring-1 ring-line hover:bg-surface-raised">
+          <button
+            onClick={() => void downloadQr('png')}
+            className="h-9 rounded-lg px-3 text-sm font-bold ring-1 ring-line hover:bg-surface-raised"
+          >
             Download QR (PNG)
           </button>
-          <button onClick={() => void downloadQr('svg')} className="h-9 rounded-lg px-3 text-sm font-bold ring-1 ring-line hover:bg-surface-raised">
+          <button
+            onClick={() => void downloadQr('svg')}
+            className="h-9 rounded-lg px-3 text-sm font-bold ring-1 ring-line hover:bg-surface-raised"
+          >
             Download QR (SVG, print)
           </button>
         </div>

@@ -13,7 +13,7 @@ import { deleteObject, listAll, ref, type StorageReference } from 'firebase/stor
 import { db } from '@/lib/firebase/db';
 import { storage } from '@/lib/firebase/storage';
 import { paths } from '@/lib/paths';
-import { DEFAULT_CONTROL } from '@/types/models';
+import { DEFAULT_CONTROL, type ControlState } from '@/types/models';
 
 export type ResetProgress = {
   step: 'epoch' | 'docs' | 'images' | 'done';
@@ -53,9 +53,12 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
 
 export async function resetEvent(eventId: string, onProgress: (p: ResetProgress) => void): Promise<void> {
   onProgress({ step: 'epoch', done: 0, total: 1, label: 'Clearing screens…' });
+  // Screen settings back to defaults, except the colour theme (it is the event's identity, not data).
+  const defaults: Partial<ControlState> = { ...DEFAULT_CONTROL };
+  delete defaults.theme;
   await setDoc(
     doc(db(), paths.control(eventId)),
-    { ...DEFAULT_CONTROL, epoch: increment(1), updatedAt: serverTimestamp() },
+    { ...defaults, epoch: increment(1), updatedAt: serverTimestamp() },
     { merge: true },
   );
 

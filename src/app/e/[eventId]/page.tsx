@@ -1,11 +1,12 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { EVENT } from '@/config/brand';
+import { BRAND } from '@/config/brand';
 import { EVENT_IDS, isEventId } from '@/config/events';
 import { PhoneFlow } from '@/components/phone/PhoneFlow';
 
-export const metadata: Metadata = { title: EVENT.fullName };
+// The phone sets the exact event name in the tab once it knows the operator's theme.
+export const metadata: Metadata = { title: BRAND.name };
 
 type Params = PageProps<'/e/[eventId]'>['params'];
 

@@ -1,7 +1,8 @@
-// LED-wall background: dark red glow, soft vertical light beams and glowing bokeh dots.
-// Everything heavy (gradients, blurred sprites) is pre-rendered once; each frame only blits
+// LED-wall background: coloured glow, soft vertical light beams and glowing bokeh dots (colours from the
+// screen theme). Everything heavy (gradients, blurred sprites) is pre-rendered once; each frame only blits
 // sprites with a slowly changing alpha, so it costs a few hundred cheap drawImage calls.
 import { BACKGROUND, type BackgroundVariant } from '@/config/background';
+import type { ScreenTheme } from '@/config/themes';
 import { rng } from '@/lib/random';
 import { setupCanvas } from './canvas';
 
@@ -80,14 +81,16 @@ export class BackgroundRenderer {
     private readonly w: number,
     private readonly h: number,
     variant: BackgroundVariant,
+    theme: ScreenTheme,
   ) {
     this.ctx = setupCanvas(target, w, h);
     const v = BACKGROUND.variants[variant];
-    const c = BACKGROUND.colors;
+    const c = theme.background;
+    const [pr, pg, pb] = c.pool;
     this.intensity = v.intensity;
     const random = rng(`${BACKGROUND.seed}:${variant}`);
 
-    // Base: deep red glow from the top centre into near-black.
+    // Base: deep coloured glow from the top centre into near-black.
     this.base = canvas(w, h);
     const b = this.base.getContext('2d')!;
     b.fillStyle = c.base;
@@ -118,9 +121,9 @@ export class BackgroundRenderer {
     o.fillRect(0, 0, w, h);
     if (v.centerDarken > 0) {
       const pool = o.createRadialGradient(w / 2, h * 0.5, 0, w / 2, h * 0.5, w * 0.55);
-      pool.addColorStop(0, `rgba(8,4,6,${v.centerDarken})`);
-      pool.addColorStop(0.7, `rgba(8,4,6,${v.centerDarken * 0.6})`);
-      pool.addColorStop(1, 'rgba(8,4,6,0)');
+      pool.addColorStop(0, `rgba(${pr},${pg},${pb},${v.centerDarken})`);
+      pool.addColorStop(0.7, `rgba(${pr},${pg},${pb},${v.centerDarken * 0.6})`);
+      pool.addColorStop(1, `rgba(${pr},${pg},${pb},0)`);
       o.fillStyle = pool;
       o.fillRect(0, 0, w, h);
     }

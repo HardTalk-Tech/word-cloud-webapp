@@ -150,6 +150,7 @@ Other usernames are rejected unless added to `src/config/operators.ts`.
 |---|---|---|
 | **Event switcher** (top bar) | Switch between `dev` and `main` | Each event has separate data |
 | **Stats** | Register someone | Registered / Answered / rate / Hidden / last arrival update live |
+| **Screen theme** | Click **Midnight Blue** (or **Crimson**) | Both LED screens switch colours live; phones show *ARROWIL AWARDS CEREMONY 2026* in silver (Crimson: *Achievers Night 2026* in gold). Preview without switching: add `?theme=midnight` to a screen URL |
 | **Mode: Live / Final crown** | Click **Final crown** | Screen 1: every attendee's photo (not just the 25 on the wall) forms a crown shape. Screen 2: filler fades, crown calms. Click **Live** to go back |
 | **Pause welcome spotlight** | Turn on, then register someone | Screen 1 skips the spotlight; the tile just pops into the wall. Turn off → queued welcomes play |
 | **Cloud spotlight question** | Click **Q1…Q5** | Screen 2 highlights that question's words, dims the rest, shows the question at the top. **All** to clear |

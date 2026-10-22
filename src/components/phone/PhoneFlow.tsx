@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { loadDeviceState, reconcileEpoch, updateDeviceState } from '@/lib/device-id';
 import type { Answers, Registration } from '@/lib/validation';
 import { useClientValue } from '@/lib/use-client-value';
+import { useEventTheme } from '@/lib/use-event-theme';
 import { Landing } from './Landing';
 import { RegisterStep } from './RegisterStep';
 import { Submitting } from './Submitting';
@@ -40,6 +41,12 @@ export function PhoneFlow({ eventId }: { eventId: string }) {
 
   // Returning visitor: label the landing button "Continue" (localStorage only, no Firebase).
   const returning = useClientValue(() => loadDeviceState(eventId).registered, false);
+  // Event name (and its gold / silver style) follows the operator's screen theme. Plain REST read, no Firebase SDK.
+  const { theme, ready: eventReady } = useEventTheme(eventId);
+
+  useEffect(() => {
+    if (eventReady) document.title = theme.event.fullName;
+  }, [eventReady, theme]);
 
   useEffect(() => {
     return () => {
@@ -134,7 +141,9 @@ export function PhoneFlow({ eventId }: { eventId: string }) {
   let content: React.ReactNode;
   switch (step) {
     case 'landing':
-      content = <Landing returning={returning} busy={busy} onJoin={join} />;
+      content = (
+        <Landing returning={returning} busy={busy} onJoin={join} event={theme.event} eventReady={eventReady} />
+      );
       break;
     case 'register':
       content = <RegisterStep initial={details} imageUrl={imageUrl} onPhoto={onPhoto} onSubmit={submit} />;
@@ -157,7 +166,7 @@ export function PhoneFlow({ eventId }: { eventId: string }) {
       content = <Questionnaire busy={busy} error={error} onSubmit={submitAnswers} />;
       break;
     case 'thanks':
-      content = <Thanks />;
+      content = <Thanks event={theme.event} eventReady={eventReady} />;
       break;
   }
 

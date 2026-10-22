@@ -1,8 +1,10 @@
 import { motion } from 'motion/react';
-import { COPY, EVENT } from '@/config/brand';
+import { COPY } from '@/config/brand';
+import type { ThemeEvent } from '@/config/themes';
+import { EventTitle } from '@/components/EventTitle';
 import { BrandMark, StepShell, Title } from './ui';
 
-export function Thanks() {
+export function Thanks({ event, eventReady }: { event: ThemeEvent; eventReady: boolean }) {
   return (
     <StepShell>
       <div className="flex flex-1 flex-col items-center justify-center gap-10">
@@ -14,8 +16,8 @@ export function Thanks() {
           <BrandMark size="lg" />
         </motion.div>
         <Title sub={COPY.thanksSub}>{COPY.thanksTitle}</Title>
-        <p className="font-serif text-xl tracking-[0.12em] text-brand-grey-light">
-          Enjoy <span className="text-gold font-bold">{EVENT.title}</span>
+        <p className="px-4 text-center font-serif text-xl tracking-[0.12em] text-brand-grey-light">
+          Enjoy <EventTitle event={event} ready={eventReady} className="font-bold" />
         </p>
       </div>
     </StepShell>

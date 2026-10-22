@@ -1,7 +1,7 @@
 // Masked word-cloud layout (pure). Runs in a Web Worker on Screen 2.
 // Words are packed as padded rectangles on the mask's cell grid; no canvas needed here —
 // text widths are measured once on the main thread and passed in as `widths`.
-import { CLOUD_PALETTE } from '@/config/brand';
+import { DEFAULT_THEME, THEMES } from '@/config/themes';
 import type { MaskGrid } from '@/lib/mask/mask';
 import { hashString, rng, type Rng } from '@/lib/random';
 
@@ -54,6 +54,8 @@ export type LayoutOptions = {
   fillerOpacityScale: number;
   /** Only the most-chosen options become big words; the rest still appear as filler. */
   maxHeroes: number;
+  /** Word colours (from the screen theme): tiers 0–3 for heroes, a few deep tones for filler. */
+  palette: { tiers: readonly string[]; filler: readonly string[] };
 };
 
 export const DEFAULT_LAYOUT: Omit<LayoutOptions, 'seed'> = {
@@ -66,6 +68,7 @@ export const DEFAULT_LAYOUT: Omit<LayoutOptions, 'seed'> = {
   maxHeroWidthRatio: 0.8,
   fillerFailLimit: 70,
   fillerOpacityScale: 1,
+  palette: THEMES[DEFAULT_THEME].cloud,
   maxHeroes: 30,
 };
 
@@ -290,7 +293,7 @@ export function layoutCloud(
             text,
             size,
             rotate: 0,
-            color: CLOUD_PALETTE.tiers[h.tier],
+            color: opts.palette.tiers[h.tier],
             opacity: 1,
             layer: 'hero',
             tier: h.tier,
@@ -314,7 +317,7 @@ export function layoutCloud(
   const floor = 0.35 / words.length;
   const weights = words.map((w) => (total > 0 ? w.count / total : 1 / words.length) + floor);
   const counters = new Map<string, number>();
-  const fillerColors = CLOUD_PALETTE.filler;
+  const fillerColors = opts.palette.filler;
 
   const tryFiller = (w: CloudWord, size: number, probes = 4, forceRotate?: 0 | 90): boolean => {
     const rotate: 0 | 90 = forceRotate ?? (random() < 0.2 ? 90 : 0);

@@ -9,6 +9,7 @@ import {
   type DocumentData,
   type Timestamp,
 } from 'firebase/firestore';
+import { DEFAULT_THEME, isThemeId } from '@/config/themes';
 import { db } from '@/lib/firebase/db';
 import { paths } from '@/lib/paths';
 import { DEFAULT_CONTROL, type Attendee, type ControlState, type ResponseDoc } from '@/types/models';
@@ -43,6 +44,7 @@ export function toControl(d: DocumentData | undefined): ControlState {
     welcomePaused: d.welcomePaused === true,
     spotlightQuestion: typeof d.spotlightQuestion === 'string' ? d.spotlightQuestion : null,
     autoRotateQuestions: d.autoRotateQuestions === true,
+    theme: isThemeId(d.theme) ? d.theme : DEFAULT_THEME,
     epoch: typeof d.epoch === 'number' ? d.epoch : DEFAULT_CONTROL.epoch,
     updatedAt: (d.updatedAt as Timestamp | null | undefined) ?? null,
   };

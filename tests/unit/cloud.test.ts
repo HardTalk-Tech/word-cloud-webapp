@@ -14,7 +14,9 @@ import {
 import { createTransition } from '@/lib/cloud/tween';
 import { isInside, maskFromAlpha, type MaskGrid } from '@/lib/mask/mask';
 import { outlineDots } from '@/lib/mask/outline';
-import { CLOUD_PALETTE } from '@/config/brand';
+import { THEMES } from '@/config/themes';
+
+const CLOUD_PALETTE = DEFAULT_LAYOUT.palette;
 import { QUESTIONS } from '@/config/questions';
 import { STAGE } from '@/config/stage';
 
@@ -159,6 +161,26 @@ describe('layoutCloud', () => {
         expect(w.text).toBe(w.text.toUpperCase());
       }
     }
+  });
+});
+
+describe('themes', () => {
+  it('colours words from the theme passed in (Midnight Blue)', () => {
+    const blue = THEMES.midnight.cloud;
+    const input = words((i) => 120 - i * 17);
+    const placed = layoutCloud(mask, input, widths, { ...DEFAULT_LAYOUT, seed: 'theme', palette: blue });
+    for (const w of placed) {
+      if (w.layer === 'hero') expect(w.color).toBe(blue.tiers[w.tier as 0 | 1 | 2 | 3]);
+      else expect(blue.filler).toContain(w.color);
+    }
+  });
+
+  it('defaults to the current (Crimson) look and carries the event names', () => {
+    expect(DEFAULT_LAYOUT.palette).toBe(THEMES.crimson.cloud);
+    expect(THEMES.crimson.event.title).toBe('Achievers Night 2026');
+    expect(THEMES.crimson.event.titleStyle).toBe('gold');
+    expect(THEMES.midnight.event.title).toBe('ARROWIL AWARDS CEREMONY 2026');
+    expect(THEMES.midnight.event.titleStyle).toBe('silver');
   });
 });
 

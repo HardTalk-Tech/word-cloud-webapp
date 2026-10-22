@@ -3,6 +3,7 @@
 import confetti from 'canvas-confetti';
 import { BRAND, COPY } from '@/config/brand';
 import { STAGE } from '@/config/stage';
+import type { Rgb, ScreenTheme } from '@/config/themes';
 import { clamp, easeInOutCubic, easeOutBack, easeOutCubic, lerp, lerpRect, type Rect } from '@/lib/anim';
 import type { FontFamilies } from '@/lib/fonts';
 import type { Phase } from '@/lib/wall/queue';
@@ -67,8 +68,11 @@ export function cardLayout(n: number): CardLayout {
   };
 }
 
+const rgba = ([r, g, b]: Rgb, a: number) => `rgba(${r},${g},${b},${a})`;
+
 /** Radial burst of soft light rays (pre-rendered once, rotated slowly behind the photo). */
-function makeBeams(): HTMLCanvasElement {
+function makeBeams(theme: ScreenTheme): HTMLCanvasElement {
+  const s = theme.spotlight;
   const size = 1024;
   const c = document.createElement('canvas');
   c.width = size;
@@ -81,9 +85,9 @@ function makeBeams(): HTMLCanvasElement {
     const spread = (i % 2 ? 0.05 : 0.085) * Math.PI;
     const g = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
     const strong = i % 3 === 0;
-    g.addColorStop(0, `rgba(255,${strong ? 170 : 90},${strong ? 180 : 105},${strong ? 0.55 : 0.4})`);
-    g.addColorStop(0.55, 'rgba(210,40,60,0.18)');
-    g.addColorStop(1, 'rgba(172,31,45,0)');
+    g.addColorStop(0, strong ? rgba(s.rayStrong, 0.55) : rgba(s.raySoft, 0.4));
+    g.addColorStop(0.55, s.rayMid);
+    g.addColorStop(1, rgba(s.rayEnd, 0));
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.moveTo(cx, cx);
@@ -93,8 +97,8 @@ function makeBeams(): HTMLCanvasElement {
   }
   // Bright core.
   const core = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx * 0.45);
-  core.addColorStop(0, 'rgba(255,200,205,0.5)');
-  core.addColorStop(1, 'rgba(255,200,205,0)');
+  core.addColorStop(0, rgba(s.core, 0.5));
+  core.addColorStop(1, rgba(s.core, 0));
   ctx.fillStyle = core;
   ctx.fillRect(0, 0, size, size);
   return c;
@@ -104,12 +108,14 @@ export class SpotlightRenderer {
   private snapshot: HTMLCanvasElement | null = null;
   private snapshotMid: HTMLCanvasElement | null = null;
   private fire: confetti.CreateTypes | null = null;
-  private readonly beams = makeBeams();
+  private readonly beams: HTMLCanvasElement;
 
   constructor(
     private readonly fonts: FontFamilies,
     confettiCanvas: HTMLCanvasElement | null,
+    private readonly theme: ScreenTheme,
   ) {
+    this.beams = makeBeams(theme);
     if (confettiCanvas) {
       confettiCanvas.width = W;
       confettiCanvas.height = H;
@@ -137,7 +143,7 @@ export class SpotlightRenderer {
     const ctx = c.getContext('2d')!;
     ctx.imageSmoothingQuality = 'medium';
     ctx.drawImage(mid, 0, 0, c.width, c.height);
-    ctx.fillStyle = 'rgba(11,11,13,0.65)';
+    ctx.fillStyle = this.theme.spotlight.dim;
     ctx.fillRect(0, 0, c.width, c.height);
     this.snapshot = c;
   }
@@ -145,7 +151,7 @@ export class SpotlightRenderer {
   burst() {
     const fire = this.fire;
     if (!fire) return;
-    const colors = [...BRAND.confetti];
+    const colors = [...this.theme.confetti];
     const base = { colors, ticks: 220, gravity: 0.9, scalar: 1.6, startVelocity: 55 };
     void fire({ ...base, particleCount: 60, spread: 70, angle: 60, origin: { x: 0, y: 0.75 } });
     void fire({ ...base, particleCount: 60, spread: 70, angle: 120, origin: { x: 1, y: 0.75 } });
@@ -197,15 +203,15 @@ export class SpotlightRenderer {
       ctx.globalAlpha = textAlpha;
       roundRectPath(ctx, pnl.x, pnl.y + lift, pnl.w, pnl.h, 28);
       const g = ctx.createLinearGradient(0, pnl.y, 0, pnl.y + pnl.h);
-      g.addColorStop(0, 'rgba(40,14,20,0.72)');
-      g.addColorStop(1, 'rgba(14,8,10,0.78)');
+      g.addColorStop(0, this.theme.spotlight.panel[0]);
+      g.addColorStop(1, this.theme.spotlight.panel[1]);
       ctx.fillStyle = g;
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.stroke();
-      // Red accent bar on top.
-      ctx.fillStyle = BRAND.red;
+      // Accent bar on top.
+      ctx.fillStyle = this.theme.accent;
       ctx.fillRect(W / 2 - 70, pnl.y + lift - 3, 140, 6);
       ctx.restore();
 
@@ -243,7 +249,7 @@ export class SpotlightRenderer {
         const baseAlpha = ctx.globalAlpha * ringAlpha;
         const ring = Math.max(6, rect.w * 0.018);
         roundRectPath(ctx, rect.x - ring * 1.6, rect.y - ring * 1.6, rect.w + ring * 3.2, rect.h + ring * 3.2, radius + ring * 1.6);
-        ctx.strokeStyle = BRAND.red;
+        ctx.strokeStyle = this.theme.accent;
         for (const [width, alpha] of [
           [ring * 7, 0.06],
           [ring * 4.5, 0.1],
@@ -280,12 +286,12 @@ export class SpotlightRenderer {
         ctx.font = nameFont(nameSize);
         ctx.fillStyle = BRAND.white;
         ctx.fillText(ellipsize(ctx, person.name, layout.nameMaxWidth), cx, layout.nameY + lift);
-        // Department, smaller, in rose.
+        // Department, smaller, in the soft accent colour.
         if (person.department) {
           const deptFont = (size: number) => `600 ${size}px ${this.fonts.display}`;
           const deptSize = fitFontSize(ctx, person.department, deptFont, layout.nameMaxWidth, layout.deptMax, 22);
           ctx.font = deptFont(deptSize);
-          ctx.fillStyle = '#FF9AA6';
+          ctx.fillStyle = this.theme.accentSoft;
           ctx.fillText(ellipsize(ctx, person.department, layout.nameMaxWidth), cx, layout.deptY + lift);
         }
         ctx.restore();

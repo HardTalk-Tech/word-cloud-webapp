@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore';
+import { DEFAULT_THEME, type ThemeId } from '@/config/themes';
 
 export type Attendee = {
   id: string;
@@ -23,6 +24,8 @@ export type ControlState = {
   welcomePaused: boolean;
   spotlightQuestion: string | null;
   autoRotateQuestions: boolean;
+  /** LED screen colour theme (+ the event name it carries). Kept across resets. */
+  theme: ThemeId;
   epoch: number;
   updatedAt?: Timestamp | null;
 };
@@ -32,6 +35,7 @@ export const DEFAULT_CONTROL: ControlState = {
   welcomePaused: false,
   spotlightQuestion: null,
   autoRotateQuestions: false,
+  theme: DEFAULT_THEME,
   epoch: 1,
 };
 

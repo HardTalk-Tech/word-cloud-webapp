@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
 import { BRAND, COPY } from '@/config/brand';
+import { DEPARTMENTS } from '@/config/departments';
+import { canonicalDepartment } from '@/lib/departments';
 import { PORTRAIT_TOP_BIAS } from '@/lib/image/resize';
 import { DEPARTMENT_MAX, NAME_MAX, validateRegistration, type Registration } from '@/lib/validation';
+import { DepartmentCombobox } from './DepartmentCombobox';
 import { BrandMark, Button, StepShell, Title } from './ui';
 
 type Errors = Partial<Record<keyof Registration | 'photo', string>>;
@@ -41,7 +44,8 @@ export function RegisterStep({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const r = validateRegistration({ name, department });
+    // A listed department typed loosely ("human resources") is saved in the list's spelling.
+    const r = validateRegistration({ name, department: canonicalDepartment(department, DEPARTMENTS) });
     const next: Errors = r.ok ? {} : { ...r.errors };
     if (!imageUrl) next.photo = 'Please add your selfie.';
     setErrors(next);
@@ -88,23 +92,19 @@ export function RegisterStep({
             </span>
           </label>
 
-          <label className="block">
+          <div>
             <span className="text-sm font-semibold text-brand-grey-light">Department</span>
-            <input
+            <DepartmentCombobox
               value={department}
               maxLength={DEPARTMENT_MAX}
-              onChange={(e) => {
-                setDepartment(e.target.value);
+              invalid={!!errors.department}
+              onChange={(v) => {
+                setDepartment(v);
                 setErrors((x) => ({ ...x, department: undefined }));
               }}
-              placeholder="e.g. Finance"
-              autoComplete="organization-title"
-              autoCapitalize="words"
-              enterKeyHint="done"
-              className={`mt-2 ${input}`}
             />
             {errors.department && <span className="mt-1 block text-sm text-red-400">{errors.department}</span>}
-          </label>
+          </div>
 
           <div>
             <span className="text-sm font-semibold text-brand-grey-light">Selfie</span>

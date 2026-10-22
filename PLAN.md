@@ -119,6 +119,14 @@ Vercel: serves the Next.js pages only.
   titles and export file names. **The LED screens do not show the event title** (client feedback): Screen 1 shows the
   stacked logo (`logo-dark.png`, crown above the wordmark) centred in its header; Screen 2 shows the crown cloud with a
   large wordmark under it.
+- **Screen themes** (`src/config/themes.ts`): every colour the two LED screens use (background, rims, glass, rings,
+  badges, spotlight, confetti, cloud word tiers / halo / filler / outline lights, wordmark letters, faint crowns) comes
+  from the active theme. **Crimson** (default, the original look; event name *Achievers Night 2026* in gold) and
+  **Midnight Blue** (navy, blue starlight, a few warm sparks; *ARROWIL AWARDS CEREMONY 2026* in silver). The operator
+  switches it in the dashboard (Screen controls → Screen theme); it is stored as `theme` in `control/state`, both
+  screens rebuild in the new colours live, and it is kept across event resets. Phones keep their own colours and only
+  show the theme's event name (read with one REST call, no Firebase SDK on the landing step). `?theme=midnight` on a
+  screen URL previews a theme on that screen only.
 - **LED background** (both screens): animated dark-red glow, soft stage-light beams and glowing bokeh dots, drawn on its own
   canvas behind the screen canvas (`components/stage/BackgroundRenderer.ts`, settings in `src/config/background.ts`).
   Pre-rendered sprites, ~30 fps, never forces the wall/cloud to redraw. The cloud variant is calmer and darkens the area
@@ -359,7 +367,11 @@ Single page, step state machine, mobile-first, dark brand theme, large tap targe
 1. **Landing**: logo, headline (`TBD` copy, e.g. "Join the wall"), one button **"Join Event"**. **No Firebase code on this step.** Tapping it starts `import('@/lib/services/register')` in the background.
 2. **Register** (one page, in this order):
    - **Name**: max 30, live char counter, profanity check.
-   - **Department**: free text, max 40, profanity check.
+   - **Department**: searchable dropdown (select2-style, `components/phone/DepartmentCombobox.tsx`) over the client's
+     list in `src/config/departments.ts`. Nothing shows until the user types; then the best 8 matches (forgiving
+     search in `lib/departments.ts`: word starts in any order, case/dashes/dots ignored, matched letters bold), with
+     "N more — keep typing". Anything not in the list is accepted as typed, no questions; a listed name typed loosely
+     is saved in the list's spelling. Max 40, profanity check.
    - **Selfie**: one tap target → `<input type="file" accept="image/*">` (no `capture`, so the phone offers camera or gallery). No crop step: the photo is cropped to a square automatically (portrait photos slightly above centre); a circular preview shows "This is how you'll appear on screen" with a "Change photo" button.
    - Consent line ("Your photo and name will be shown on the event screens") + **Submit**. All three fields required; errors shown inline.
 3. **Submitting**: progress ring (combined `uploadBytesResumable` progress of spot + tile), auto-retry up to 3× with backoff (1s, 2s, 4s). Friendly error with "Try again" / "Edit details".

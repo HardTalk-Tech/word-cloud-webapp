@@ -45,6 +45,15 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* Event title: brushed silver (Arrowil Awards Ceremony). Keep in sync with BRAND.silver* in src/config/brand.ts. */
+.text-silver {
+  color: #c3c9cf;
+  background: linear-gradient(180deg, #f4f6f8 0%, #c3c9cf 55%, #8a9198 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* Thin, dark scrollbars on the dashboard. */
 .dash-scroll {
   scrollbar-width: thin;

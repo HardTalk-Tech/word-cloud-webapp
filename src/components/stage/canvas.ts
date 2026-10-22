@@ -51,6 +51,23 @@ export function glowSprite(color: string, size = 64): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * Faint decorative crown for the current theme: the brand crown as is, or a solid tint of it
+ * (e.g. blue on the Midnight theme). The header logo always keeps the original brand colours.
+ */
+export function decorCrown(crown: HTMLImageElement | null, tint: string | null): CanvasImageSource | null {
+  if (!crown || !tint) return crown;
+  const c = document.createElement('canvas');
+  c.width = crown.naturalWidth;
+  c.height = crown.naturalHeight;
+  const ctx = c.getContext('2d')!;
+  ctx.drawImage(crown, 0, 0);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = tint;
+  ctx.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+
 /** Start a screen frame: clear (background canvas shows through) or fill when the background is off. */
 export function clearStage(ctx: CanvasRenderingContext2D, w: number, h: number) {
   if (BACKGROUND.enabled) {
