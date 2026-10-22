@@ -8,12 +8,16 @@ async function main() {
   const a = args();
   const eventId = eventArg(a);
   const count = Number(a.count ?? 100);
+  if (!Number.isInteger(count) || count < 1) throw new Error(`--count must be a whole number ≥ 1 (got "${a.count}")`);
   const share = Number(a.responses ?? 0.8);
   const unique = Math.max(1, Math.min(count, Number(a.unique ?? 30)));
   const delay = Number(a.delay ?? 0);
   const fb = firebase();
 
-  console.log(`Seeding ${count} attendees into "${eventId}" (${unique} unique photos, ${Math.round(share * 100)}% answer)…`);
+  console.log(
+    `Seeding ${count} attendees into "${eventId}"${a.count === undefined ? ' (no --count given, using the default)' : ''}` +
+      ` (${unique} unique photos, ${Math.round(share * 100)}% answer${delay > 0 ? `, one every ${delay} ms` : ''})…`,
+  );
   const photos: { spotUrl: string; tileUrl: string; lqip: string }[] = [];
   await pool(
     Array.from({ length: unique }, (_, i) => i),

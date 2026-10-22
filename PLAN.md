@@ -414,10 +414,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 - Remove from queue if it becomes hidden.
 - If `control.epoch` changes (reset): clear queue, image cache and `lastSpotlightedAt`, and treat the next attendees snapshot as a fresh initial snapshot (empty wall, no spotlights for old data). Same for Screen 2: clear layout and return to empty state.
 - Timings in `config/timings.ts`:
-  - queue 1–3: hold 3.5s
-  - queue 4–10: hold 2.0s
-  - queue > 10: **group spotlight** of up to 4 people side by side, hold 3.0s
-  - SPOT_IN 0.6s, SPOT_FLY 0.9s
+  - **One person at a time, 3 s each, whatever the queue length** (client request): SPOT_IN 0.5s, hold 1.8s, SPOT_FLY 0.7s. No group spotlights and nobody is skipped, so a burst plays as a steady stream (30 people ≈ 90 s).
 - If `welcomePaused` is true: keep queue but stay in `WALL_IDLE`; tiles still appear on the wall with a small pop.
 
 **Spotlight visual** (`SpotlightRenderer.ts`):
@@ -549,7 +546,7 @@ Unit-test the size maths; manually test on an iPhone and a low-end Android.
 **Done when:** with 1000 seeded attendees the wall renders at 60fps on the event laptop at stage resolution, new attendees pop into place within 2s of registering.
 
 ### Phase 3 — Welcome spotlight loop
-- [x] `queue.ts` state machine (unit tests: ordering, burst handling, group spotlight, hidden removal, reload catch-up).
+- [x] `queue.ts` state machine (unit tests: ordering, one-at-a-time bursts with fixed 3 s spotlights, hidden removal, reload catch-up).
 - [x] `SpotlightRenderer.ts` (dim/blur snapshot, card, name auto-fit, confetti, FLIP fly-in).
 - [x] Pre-decode spotlight image before SPOT_IN.
 - [x] `welcomePaused` support.
