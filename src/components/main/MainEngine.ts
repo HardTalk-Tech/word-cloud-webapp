@@ -10,7 +10,15 @@ import { containRect, loadMask } from '@/lib/mask/mask';
 import { catchUpIds, enqueue, initialQueue, removeId, tick, type QueueState } from '@/lib/wall/queue';
 import { assignSlots, gridCapacity, gridSlot, wallWindow } from '@/lib/wall/slots';
 import { DEFAULT_CONTROL, type Attendee, type ControlState, type WallAttendee } from '@/types/models';
-import { NO_BRAND_IMAGES, drawWordmark, loadBrandImages, setupCanvas, type BrandImages } from '@/components/stage/canvas';
+import type { ScreenTheme } from '@/config/themes';
+import {
+  NO_BRAND_IMAGES,
+  decorCrown,
+  drawWordmark,
+  loadBrandImages,
+  setupCanvas,
+  type BrandImages,
+} from '@/components/stage/canvas';
 import { setBackgroundPaused } from '@/components/stage/BackgroundRenderer';
 import type { DebugStats } from '@/components/stage/DebugOverlay';
 import { FinalMosaic } from './FinalMosaic';
@@ -96,7 +104,9 @@ export class MainEngine {
   /** Where the crown sits in final mode: the faint crown is drawn here behind the photo mosaic. */
   private finalCrownRect: Rect | null = null;
 
-  private readonly sprites = new WallSprites();
+  private readonly sprites: WallSprites;
+  /** Faint crown for the watermark / finale, in the theme's colour. */
+  private crownDecor: CanvasImageSource | null = null;
   /** New arrivals → when they appeared (soft red ring fading over WALL.newArrivalMs). */
   private recent = new Map<string, number>();
   private sweepAt = -Infinity;
@@ -120,13 +130,15 @@ export class MainEngine {
     private readonly canvas: HTMLCanvasElement,
     confettiCanvas: HTMLCanvasElement | null,
     private readonly eventId: string,
+    private readonly theme: ScreenTheme,
   ) {
+    this.sprites = new WallSprites(theme);
     this.ctx = setupCanvas(canvas, W, H, { transparent: true });
     this.fonts = fontFamilies();
     this.cache = new ImageCache(12, () => {
       this.dirty = true;
     });
-    this.spot = new SpotlightRenderer(this.fonts, confettiCanvas);
+    this.spot = new SpotlightRenderer(this.fonts, confettiCanvas, theme);
     this.nextSweepAt = performance.now() + WALL.sweepEveryMinMs;
   }
 
@@ -134,6 +146,7 @@ export class MainEngine {
     const [brand] = await Promise.all([loadBrandImages(), ensureFonts(this.fonts)]);
     if (this.destroyed) return;
     this.brand = brand;
+    this.crownDecor = decorCrown(brand.crown, this.theme.crownTint);
     if (brand.crown) {
       // Watermark: the real crown, centred behind the rings.
       this.watermarkRect = containRect(brand.crown.naturalWidth, brand.crown.naturalHeight, {
@@ -462,13 +475,13 @@ export class MainEngine {
     }
     const fin = this.final.amount(now);
     const wallA = 1 - fin;
-    drawWatermark(ctx, this.brand.crown, this.watermarkRect, wallA);
+    drawWatermark(ctx, this.crownDecor, this.watermarkRect, wallA);
     // Final mode: the real crown, faint, behind the photo mosaic so the design reads through it.
-    if (fin > 0 && this.brand.crown && this.finalCrownRect) {
+    if (fin > 0 && this.crownDecor && this.finalCrownRect) {
       const r = this.finalCrownRect;
       ctx.save();
       ctx.globalAlpha = 0.28 * fin;
-      ctx.drawImage(this.brand.crown, r.x, r.y, r.w, r.h);
+      ctx.drawImage(this.crownDecor, r.x, r.y, r.w, r.h);
       ctx.restore();
     }
     drawHeader(ctx, this.fonts, this.brand, wallA);

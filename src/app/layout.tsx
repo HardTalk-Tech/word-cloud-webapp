@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
-import { EVENT } from "@/config/brand";
+import { BRAND } from "@/config/brand";
 import "./globals.css";
 
 const display = Montserrat({
@@ -15,9 +15,10 @@ const serif = Cormorant_Garamond({
   subsets: ["latin"],
 });
 
+// The event name depends on the operator's theme (set at runtime); the static title is the brand.
 export const metadata: Metadata = {
-  title: EVENT.fullName,
-  description: `${EVENT.fullName}: join the wall with your selfie and share your answers on the big screen.`,
+  title: BRAND.name,
+  description: `${BRAND.name}: join the wall with your selfie and share your answers on the big screen.`,
 };
 
 export const viewport: Viewport = {

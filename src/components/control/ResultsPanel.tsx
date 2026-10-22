@@ -12,7 +12,8 @@ export function ResultsPanel({ responses }: { responses: ResponseDoc[] }) {
       <p className="mt-1 text-xs text-brand-grey">
         % of respondents per question. Multiple choices allowed, so totals can exceed 100%.
       </p>
-      <div className="mt-4 flex flex-col gap-6">
+      {/* Full width under the table: questions side by side instead of one long column. */}
+      <div className="mt-4 grid gap-x-8 gap-y-6 md:grid-cols-2 2xl:grid-cols-3">
         {QUESTIONS.map((q) => {
           const qc = agg.byQuestion.get(q.id)!;
           const max = Math.max(1, ...qc.counts.values());
@@ -31,7 +32,7 @@ export function ResultsPanel({ responses }: { responses: ResponseDoc[] }) {
                 {options.map((o) => {
                   const pct = qc.respondents ? Math.round((o.count / qc.respondents) * 100) : 0;
                   return (
-                    <div key={o.id} className="grid grid-cols-[96px_1fr_72px] items-center gap-2 text-sm">
+                    <div key={o.id} className="grid grid-cols-[120px_1fr_72px] items-center gap-2 text-sm">
                       <span className="truncate text-brand-grey-light">{o.label}</span>
                       <div className="h-3 overflow-hidden rounded-full bg-surface-raised">
                         <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${(o.count / max) * 100}%` }} />

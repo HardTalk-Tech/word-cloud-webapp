@@ -3,6 +3,7 @@
 // gradients or clips is pre-rendered into sprites, so a frame is mostly drawImage calls.
 import { BRAND } from '@/config/brand';
 import { RING_PATTERN, STAGE } from '@/config/stage';
+import type { Rgb, ScreenTheme } from '@/config/themes';
 import { WALL } from '@/config/timings';
 import { clamp, easeInOutCubic, easeOutBack, easeOutCubic, progress, type Rect } from '@/lib/anim';
 import type { FontFamilies } from '@/lib/fonts';
@@ -73,8 +74,10 @@ function spriteCanvas(w: number, h = w): [HTMLCanvasElement, CanvasRenderingCont
   return [c, c.getContext('2d')!];
 }
 
-/** Round photo with a thin red rim (lighter at the top, like lit glass). */
-function makeTileSprite(img: HTMLImageElement): HTMLCanvasElement {
+const rgba = ([r, g, b]: Rgb, a: number) => `rgba(${r},${g},${b},${a})`;
+
+/** Round photo with a thin accent rim (lighter at the top, like lit glass). */
+function makeTileSprite(img: HTMLImageElement, theme: ScreenTheme): HTMLCanvasElement {
   const size = clamp(Math.round(img.naturalWidth), SPRITE_MIN, SPRITE_MAX);
   const [c, ctx] = spriteCanvas(size);
   const r = size / 2;
@@ -82,8 +85,8 @@ function makeTileSprite(img: HTMLImageElement): HTMLCanvasElement {
   ctx.beginPath();
   ctx.arc(r, r, r, 0, TAU);
   const g = ctx.createLinearGradient(0, 0, 0, size);
-  g.addColorStop(0, '#E2475A');
-  g.addColorStop(1, '#7A1622');
+  g.addColorStop(0, theme.wall.rim[0]);
+  g.addColorStop(1, theme.wall.rim[1]);
   ctx.fillStyle = g;
   ctx.fill();
   ctx.save();
@@ -104,19 +107,19 @@ function makeTileSprite(img: HTMLImageElement): HTMLCanvasElement {
   return c;
 }
 
-/** Empty slot: dim red glass circle. */
-function makeGlassSprite(): HTMLCanvasElement {
+/** Empty slot: dim glass circle in the theme colour. */
+function makeGlassSprite(theme: ScreenTheme): HTMLCanvasElement {
   const [c, ctx] = spriteCanvas(GLASS);
   const r = GLASS / 2;
   ctx.beginPath();
   ctx.arc(r, r, r - 2, 0, TAU);
   const g = ctx.createLinearGradient(0, 0, GLASS, GLASS);
-  g.addColorStop(0, 'rgba(120,22,36,0.42)');
-  g.addColorStop(1, 'rgba(40,8,14,0.42)');
+  g.addColorStop(0, theme.wall.glass.from);
+  g.addColorStop(1, theme.wall.glass.to);
   ctx.fillStyle = g;
   ctx.fill();
   ctx.lineWidth = GLASS * 0.025;
-  ctx.strokeStyle = 'rgba(214,60,78,0.34)';
+  ctx.strokeStyle = theme.wall.glass.stroke;
   ctx.stroke();
   ctx.save();
   ctx.clip();
@@ -129,8 +132,8 @@ function makeGlassSprite(): HTMLCanvasElement {
   return c;
 }
 
-/** Glowing red circle outline for highlighted tiles (drawn larger than the tile). */
-function makeRingSprite(): HTMLCanvasElement {
+/** Glowing circle outline for highlighted tiles (drawn larger than the tile). */
+function makeRingSprite(theme: ScreenTheme): HTMLCanvasElement {
   const size = 160;
   const [c, ctx] = spriteCanvas(size);
   for (const [width, alpha] of [
@@ -141,19 +144,19 @@ function makeRingSprite(): HTMLCanvasElement {
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2 - 20, 0, TAU);
     ctx.lineWidth = width;
-    ctx.strokeStyle = `rgba(232,62,80,${alpha})`;
+    ctx.strokeStyle = rgba(theme.wall.ring, alpha);
     ctx.stroke();
   }
   return c;
 }
 
 /** Soft diagonal band of light for the sweep. */
-function makeSweepSprite(): HTMLCanvasElement {
+function makeSweepSprite(theme: ScreenTheme): HTMLCanvasElement {
   const [c, ctx] = spriteCanvas(260, 8);
   const g = ctx.createLinearGradient(0, 0, 260, 0);
-  g.addColorStop(0, 'rgba(255,230,234,0)');
-  g.addColorStop(0.5, 'rgba(255,230,234,0.55)');
-  g.addColorStop(1, 'rgba(255,230,234,0)');
+  g.addColorStop(0, rgba(theme.wall.sweep, 0));
+  g.addColorStop(0.5, rgba(theme.wall.sweep, 0.55));
+  g.addColorStop(1, rgba(theme.wall.sweep, 0));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 260, 8);
   return c;
@@ -190,7 +193,13 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, width: number, m
  * spaced capitals (brand rose), wrapping to two lines when long. Dark glass pill with a red rim and a lit
  * top edge. `d` = circle diameter; the badge may run a little wider than the circle (still inside its cell).
  */
-function makeLabelSprite(fonts: FontFamilies, name: string, department: string, d: number): LabelSprite {
+function makeLabelSprite(
+  fonts: FontFamilies,
+  name: string,
+  department: string,
+  d: number,
+  theme: ScreenTheme,
+): LabelSprite {
   const [, m] = spriteCanvas(1);
   const maxText = d * 1.02;
   const nameFont = (s: number) => `800 ${s}px ${fonts.display}`;
@@ -232,12 +241,12 @@ function makeLabelSprite(fonts: FontFamilies, name: string, department: string, 
   // Glass pill.
   roundRectPath(ctx, 1, 1, w - 2, h - 2, radius);
   const bg = ctx.createLinearGradient(0, 0, 0, h);
-  bg.addColorStop(0, 'rgba(46,14,22,0.94)');
-  bg.addColorStop(1, 'rgba(12,6,8,0.94)');
+  bg.addColorStop(0, theme.wall.label.top);
+  bg.addColorStop(1, theme.wall.label.bottom);
   ctx.fillStyle = bg;
   ctx.fill();
   ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(226,71,90,0.85)';
+  ctx.strokeStyle = theme.wall.label.stroke;
   ctx.stroke();
   ctx.save();
   ctx.clip();
@@ -256,19 +265,19 @@ function makeLabelSprite(fonts: FontFamilies, name: string, department: string, 
   ctx.fillText(nameText, cx, padY + nameSize * 0.52);
 
   if (deptLines.length) {
-    // Short red divider that fades at both ends.
+    // Short accent divider that fades at both ends.
     const lineY = padY + nameSize + gap / 2;
     const half = Math.min(w * 0.3, Math.max(nameW, deptW) / 2);
     const g = ctx.createLinearGradient(cx - half, 0, cx + half, 0);
-    g.addColorStop(0, 'rgba(226,71,90,0)');
-    g.addColorStop(0.5, 'rgba(226,71,90,0.95)');
-    g.addColorStop(1, 'rgba(226,71,90,0)');
+    g.addColorStop(0, rgba(theme.wall.label.divider, 0));
+    g.addColorStop(0.5, rgba(theme.wall.label.divider, 0.95));
+    g.addColorStop(1, rgba(theme.wall.label.divider, 0));
     ctx.fillStyle = g;
     ctx.fillRect(cx - half, lineY - 0.75, half * 2, 1.5);
 
     ctx.font = deptFont(deptSize);
     ctx.letterSpacing = spacing(deptSize);
-    ctx.fillStyle = '#FF9AA6';
+    ctx.fillStyle = theme.accentSoft;
     deptLines.forEach((line, i) => {
       // letterSpacing adds space after the last glyph too: nudge back so the line stays centred.
       ctx.fillText(line, cx + deptSize * 0.05, padY + nameSize + gap + deptSize * 0.52 + i * lineH);
@@ -277,16 +286,24 @@ function makeLabelSprite(fonts: FontFamilies, name: string, department: string, 
   return { canvas: c, w, h };
 }
 
-/** Holds the pre-rendered wall sprites. */
+/** Holds the pre-rendered wall sprites, coloured for one screen theme. */
 export class WallSprites {
-  readonly glass = makeGlassSprite();
-  readonly ring = makeRingSprite();
-  readonly glow = glowSprite('rgba(232,52,72,1)', 96);
-  readonly spark = glowSprite('#FFD9DD', 48);
-  readonly sweep = makeSweepSprite();
+  readonly glass: HTMLCanvasElement;
+  readonly ring: HTMLCanvasElement;
+  readonly glow: HTMLCanvasElement;
+  readonly spark: HTMLCanvasElement;
+  readonly sweep: HTMLCanvasElement;
   private tiles = new WeakMap<object, HTMLCanvasElement>();
   private labels = new Map<string, LabelSprite>();
   private rings: HTMLCanvasElement | null = null;
+
+  constructor(private readonly theme: ScreenTheme) {
+    this.glass = makeGlassSprite(theme);
+    this.ring = makeRingSprite(theme);
+    this.glow = glowSprite(theme.wall.glow, 96);
+    this.spark = glowSprite(theme.wall.spark, 48);
+    this.sweep = makeSweepSprite(theme);
+  }
 
   /** The decorative ring outlines, drawn once on a stage-size canvas (they never move). */
   ringLayer(): HTMLCanvasElement {
@@ -301,7 +318,7 @@ export class WallSprites {
     RING_PATTERN.radii.forEach((k, i) => {
       ctx.globalAlpha = i % 2 ? 0.16 : 0.24;
       ctx.lineWidth = i % 2 ? 1.5 : 2.5;
-      ctx.strokeStyle = BRAND.red;
+      ctx.strokeStyle = this.theme.accent;
       ctx.beginPath();
       ctx.arc(box.x + box.w / 2, box.y + box.h / 2, (box.w / 2) * k, 0, TAU);
       ctx.stroke();
@@ -315,7 +332,7 @@ export class WallSprites {
     if (!img) return null;
     let s = this.tiles.get(img);
     if (!s) {
-      s = makeTileSprite(img);
+      s = makeTileSprite(img, this.theme);
       this.tiles.set(img, s);
     }
     return s;
@@ -326,7 +343,7 @@ export class WallSprites {
     const key = `${Math.round(d)}|${name}|${department}`;
     let l = this.labels.get(key);
     if (!l) {
-      l = makeLabelSprite(fonts, name, department, d);
+      l = makeLabelSprite(fonts, name, department, d, this.theme);
       if (this.labels.size >= 64) this.labels.delete(this.labels.keys().next().value!);
       this.labels.set(key, l);
     }

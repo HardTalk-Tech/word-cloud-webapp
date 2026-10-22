@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BRAND, EVENT } from '@/config/brand';
+import { BRAND } from '@/config/brand';
 import { DEFAULT_EVENT } from '@/config/events';
 import { operatorSignIn } from '@/lib/firebase/auth';
+import { useEventTheme } from '@/lib/use-event-theme';
+import { EventTitle } from '@/components/EventTitle';
 
 function safeNext(): string {
   const next = new URLSearchParams(window.location.search).get('next');
@@ -17,6 +19,8 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Event name of the live event (follows its screen theme).
+  const { theme, ready } = useEventTheme(DEFAULT_EVENT);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +41,9 @@ export function LoginForm() {
         <div className="flex flex-col items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={BRAND.logo} alt={BRAND.name} className="h-28 w-auto" />
-          <p className="text-gold mt-3 text-sm font-bold tracking-[0.14em] uppercase">{EVENT.title}</p>
+          <p className="mt-3 text-center text-sm font-bold tracking-[0.14em] uppercase">
+            <EventTitle event={theme.event} ready={ready} />
+          </p>
           <h1 className="mt-2 text-xl font-extrabold">Operator sign in</h1>
         </div>
         <label className="mt-8 block text-sm font-semibold text-brand-grey-light">

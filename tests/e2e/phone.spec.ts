@@ -6,7 +6,10 @@ test('phone: register with name, department and selfie, answer, see thanks', asy
   await page.getByRole('button', { name: /join event|continue/i }).click();
 
   await page.getByPlaceholder('Your name').fill('E2E Tester');
-  await page.getByPlaceholder('e.g. Finance').fill('Quality Assurance');
+  // Searchable department: type part of the name, pick the suggestion.
+  await page.getByPlaceholder('Search your department').fill('quality');
+  await page.getByRole('option', { name: 'Quality Assurance' }).click();
+  await expect(page.getByPlaceholder('Search your department')).toHaveValue('Quality Assurance');
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /add your selfie/i }).click();
   await (await chooser).setFiles(path.join(__dirname, 'fixtures', 'selfie.jpg'));

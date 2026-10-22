@@ -93,7 +93,7 @@ export function AttendeeTable({
         </select>
       </div>
 
-      <div ref={scrollRef} className="dash-scroll h-[max(520px,calc(100dvh-260px))] overflow-auto">
+      <div ref={scrollRef} className="dash-scroll h-[max(480px,calc(100dvh-420px))] overflow-auto">
         <div className="min-w-360">
           <div
             className="sticky top-0 z-10 grid items-center gap-3 border-b border-line bg-surface px-4 py-2 text-xs font-semibold tracking-wide text-brand-grey uppercase"

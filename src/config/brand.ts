@@ -1,10 +1,5 @@
-/** The event. Shown on the phone landing page, both LED screens, the dashboard and page titles. */
-export const EVENT = {
-  /** Short title for headlines and the screens. */
-  title: 'Achievers Night 2026',
-  /** Full name for page titles and exports. */
-  fullName: 'George Steuart Health Achievers Night 2026',
-} as const;
+// The event name (title, colour, export prefix) depends on the screen theme the operator picks:
+// see `event` in src/config/themes.ts.
 
 export const BRAND = {
   name: 'George Steuart Health',
@@ -12,10 +7,13 @@ export const BRAND = {
   red: '#AC1F2D',
   /** "HEALTH" teal from the George Steuart Health wordmark. */
   teal: '#11B9A8',
-  /** Event title ("Achievers Night 2026"): metallic gold, light → main → deep. */
+  /** Event title colours (light → main → deep): gold for Achievers Night, silver for Arrowil Awards. */
   goldLight: '#F6DC8D',
   gold: '#D4AF37',
   goldDark: '#A9822A',
+  silverLight: '#F4F6F8',
+  silver: '#C3C9CF',
+  silverDark: '#8A9198',
   redLight: '#C8303F',
   redDark: '#6E1420',
   grey: '#8A8A8D',
@@ -37,21 +35,11 @@ export const BRAND = {
   confetti: ['#AC1F2D', '#FFFFFF', '#B3B5B8', '#E04656'],
 } as const;
 
-/** Word-cloud colours (Screen 2). Tiers by rank of the answer. */
-export const CLOUD_PALETTE = {
-  /** 0 = top 3 (white with red halo), 1 = next (light rose), 2 = middle (brand red), 3 = least chosen. */
-  tiers: ['#FFFFFF', '#FF9AA6', '#D8384A', '#9E1E2E'],
-  /** Halo behind top-tier words: [r, g, b]. */
-  halo: [172, 31, 45] as const,
-  /** Small repeated words that fill the crown: deep reds, drawn faint. */
-  filler: ['#9A1C2B', '#B5303F', '#7E1824'],
-  /** Lights along the crown outline. */
-  outline: '#FF4D5E',
-} as const;
+// LED screen colours (word cloud, wall, background, spotlight) live in the screen themes: src/config/themes.ts.
 
 /**
  * Screen 2 wordmark: the real "George Steuart / HEALTH" drawn faint as a frame, with a sprinkle of small
- * random letters living inside its strokes (clipped to them).
+ * random letters living inside its strokes (clipped to them). Letter colours come from the screen theme.
  */
 export const WORDMARK_MOSAIC = {
   /** Wordmark width, × stage width. */
@@ -65,15 +53,8 @@ export const WORDMARK_MOSAIC = {
   keep: 0.88,
   /** Letter size, × cell. */
   fontScale: 0.95,
-  /** Letter colours: brighter tints of the stroke underneath. */
-  name: '#F2EEEA',
-  health: '#A8F2E8',
   letterOpacity: 0.88,
-  /** Twinkling letters drawn brighter on top. */
-  twinkle: '#FFFFFF',
   seed: 'gsh-wordmark',
-  /** Soft star sparks shed by letters flying out of the wordmark. */
-  spark: '#FFE6EA',
 } as const;
 
 /** CSS variables set by next/font in the root layout. Canvas code reads them at runtime. */

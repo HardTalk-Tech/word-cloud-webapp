@@ -1,6 +1,7 @@
 // Screen 2 engine: responses → counts → masked layout (worker) → tween → canvas.
 // The wordmark under the crown is built from tiny letters; new answers' letters fly out of it into the crown.
-import { BRAND, CLOUD_PALETTE, WORDMARK_MOSAIC } from '@/config/brand';
+import { BRAND, WORDMARK_MOSAIC } from '@/config/brand';
+import type { ScreenTheme } from '@/config/themes';
 import { QUESTIONS } from '@/config/questions';
 import { STAGE } from '@/config/stage';
 import { CLOUD } from '@/config/timings';
@@ -29,6 +30,7 @@ import { DEFAULT_CONTROL, type ControlState, type ResponseDoc } from '@/types/mo
 import {
   NO_BRAND_IMAGES,
   clearStage,
+  decorCrown,
   drawWordmark,
   ellipsize,
   fitFontSize,
@@ -90,8 +92,6 @@ function makeStarSprite(color: string, size = 48): HTMLCanvasElement {
   return c;
 }
 
-const glyphColor = (g: Glyph) => (g.tone === 'health' ? WORDMARK_MOSAIC.health : WORDMARK_MOSAIC.name);
-
 /** Small stable integer hash, for picking twinkling glyphs. */
 function mix(n: number): number {
   let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
@@ -113,6 +113,8 @@ export class CloudRenderer {
   private readonly fonts: FontFamilies;
   private mask: LoadedMask | null = null;
   private brand: BrandImages = NO_BRAND_IMAGES;
+  /** Faint crown behind the words, in the theme's colour. */
+  private crownDecor: CanvasImageSource | null = null;
   private widths: Record<string, number> | null = null;
   private outline: OutlineDot[] = [];
   private readonly outlineSprite: HTMLCanvasElement;
@@ -181,12 +183,13 @@ export class CloudRenderer {
   constructor(
     canvas: HTMLCanvasElement,
     private readonly eventId: string,
+    private readonly theme: ScreenTheme,
   ) {
     this.ctx = setupCanvas(canvas, W, H, { transparent: true });
     this.fonts = fontFamilies();
-    this.outlineSprite = glowSprite(CLOUD_PALETTE.outline);
-    this.sparkSprite = glowSprite('#FFD9DD');
-    this.starSprite = makeStarSprite(WORDMARK_MOSAIC.spark);
+    this.outlineSprite = glowSprite(theme.cloud.outline);
+    this.sparkSprite = glowSprite(theme.cloud.spark);
+    this.starSprite = makeStarSprite(theme.cloud.star);
     try {
       this.worker = new Worker(new URL('../../lib/cloud/layout.worker.ts', import.meta.url), { type: 'module' });
       this.worker.onmessage = (e: MessageEvent<LayoutResponse>) => this.onLayout(e.data);
@@ -204,6 +207,7 @@ export class CloudRenderer {
   async init() {
     const [brand] = await Promise.all([loadBrandImages(), ensureFonts(this.fonts)]);
     this.brand = brand;
+    this.crownDecor = decorCrown(brand.crown, this.theme.crownTint);
     this.measure();
     this.buildMosaic();
     try {
@@ -272,7 +276,7 @@ export class CloudRenderer {
     lctx.textAlign = 'center';
     lctx.textBaseline = 'middle';
     for (const g of this.glyphs) {
-      lctx.fillStyle = glyphColor(g);
+      lctx.fillStyle = this.glyphColor(g);
       lctx.fillText(g.char, g.x - out.x, g.y - out.y);
     }
     lctx.globalCompositeOperation = 'destination-in';
@@ -281,6 +285,10 @@ export class CloudRenderer {
     ctx.globalAlpha = WORDMARK_MOSAIC.letterOpacity;
     ctx.drawImage(letters, 0, 0);
     this.mosaic = { sprite, rect: out };
+  }
+
+  private glyphColor(g: Glyph): string {
+    return g.tone === 'health' ? this.theme.cloud.mosaicHealth : this.theme.cloud.mosaicName;
   }
 
   /** A wordmark glyph's position on screen right now (the wordmark grows slightly in the finale). */
@@ -438,6 +446,7 @@ export class CloudRenderer {
       includeFiller: !isFinal,
       maxHero: isFinal ? DEFAULT_LAYOUT.maxHero * 1.1 : DEFAULT_LAYOUT.maxHero,
       fillerOpacityScale: this.agg.respondents === 0 ? 0.55 : 1,
+      palette: this.theme.cloud,
     };
     this.layoutKey = countsKey(this.counts);
     this.needsLayout = false;
@@ -547,12 +556,12 @@ export class CloudRenderer {
     const empty = this.agg.respondents === 0 ? 1 : 0;
 
     // The George Steuart crown, faint behind the words, so the design reads even before anyone answers.
-    if (this.brand.crown && this.mask) {
+    if (this.crownDecor && this.mask) {
       const r = this.mask.rect;
       ctx.save();
       // Brighter when empty and in the finale (filler that outlined the crown has faded out).
       ctx.globalAlpha = 0.12 + 0.1 * empty + 0.16 * fin;
-      ctx.drawImage(this.brand.crown, r.x, r.y, r.w, r.h);
+      ctx.drawImage(this.crownDecor, r.x, r.y, r.w, r.h);
       ctx.restore();
     }
 
@@ -602,7 +611,7 @@ export class CloudRenderer {
     ctx.font = `800 ${(GLYPH_SIZE * s).toFixed(1)}px ${this.fonts.display}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = WORDMARK_MOSAIC.twinkle;
+    ctx.fillStyle = this.theme.cloud.twinkle;
     const count = CLOUD.twinkleCount;
     for (let k = 0; k < count; k++) {
       // Each twinkle slot lights a different glyph per cycle, out of step with the others.
@@ -675,7 +684,7 @@ export class CloudRenderer {
   private drawWords(now: number) {
     const ctx = this.ctx;
     const t = now / 1000;
-    const [hr, hg, hb] = CLOUD_PALETTE.halo;
+    const [hr, hg, hb] = this.theme.cloud.halo;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.lineJoin = 'round';
@@ -761,7 +770,7 @@ export class CloudRenderer {
         alive = true;
         const from = this.glyphPoint(L.glyph);
         const g = this.glyphs[L.glyph];
-        const toneColor = glyphColor(g);
+        const toneColor = this.glyphColor(g);
         const to = targets[L.index] ?? targets[targets.length - 1] ?? fallback;
         const ch = text[L.index] ?? L.char;
         let pos: Point;
@@ -831,7 +840,7 @@ export class CloudRenderer {
     const font = (s: number) => `700 ${s}px ${this.fonts.display}`;
     ctx.save();
     ctx.globalAlpha = barAlpha;
-    ctx.fillStyle = BRAND.red;
+    ctx.fillStyle = this.theme.accent;
     ctx.fillRect(W / 2 - 60, H * 0.035, 120, 6);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

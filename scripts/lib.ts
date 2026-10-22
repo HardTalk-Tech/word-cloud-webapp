@@ -5,6 +5,7 @@ import { initializeApp } from 'firebase/app';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore/lite';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import sharp from 'sharp';
+import { DEPARTMENTS } from '../src/config/departments';
 import { QUESTIONS } from '../src/config/questions';
 import { isEventId } from '../src/config/events';
 import { paths } from '../src/lib/paths';
@@ -144,8 +145,7 @@ export function eventArg(a: Record<string, string>): string {
 const FIRST = ['Kasun', 'Nimali', 'Ashan', 'Dilini', 'Ruwan', 'Tharushi', 'Sanjay', 'Fathima', 'Pradeep', 'Ishara', 'Mohamed', 'Anushka', 'Chamara', 'Priya', 'Lahiru', 'Nadeesha', 'Kavinda', 'Sachini', 'Arjun', 'Hiruni'];
 const LAST = ['Perera', 'Fernando', 'Silva', 'Jayasinghe', 'Wickramasinghe', 'Bandara', 'Rajapaksa', 'Dias', 'Kumar', 'Mendis', 'Rathnayake', 'Herath'];
 
-const DEPARTMENTS = ['Finance', 'Human Resources', 'IT', 'Marketing', 'Sales', 'Operations', 'Logistics', 'Travel'];
-
+/** Real department names (the phone's dropdown list). */
 export function fakeDepartment(i: number): string {
   return DEPARTMENTS[(i * 7) % DEPARTMENTS.length];
 }
